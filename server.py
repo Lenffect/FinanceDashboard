@@ -757,7 +757,8 @@ def samenvatting_md():
 
 
 def export_doel():
-    gekozen = (settings().get('export_map') or '').strip()
+    gekozen = (settings().get('export_map') or '').strip().strip('"').strip("'")
+    gekozen = re.sub(r'\\(.)', r'\1', gekozen)  # een uit de Terminal geplakt pad heeft \ voor spaties en ~ (Mobile\ Documents)
     doel = os.path.abspath(os.path.expanduser(gekozen)) if gekozen else os.path.join(BASE, 'export')
     verboden = [BASE, DATA, INBOX, ARCHIEF, os.path.join(BASE, 'btw')]
     if any(os.path.normpath(doel) == os.path.normpath(v) for v in verboden):
