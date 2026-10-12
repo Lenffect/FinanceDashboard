@@ -1,0 +1,9 @@
+# Privé financiële gegevens horen niet in git
+data/*.db
+data/*.db-journal
+data/backup/
+facturen/
+inbox/
+*.csv
+__pycache__/
+.DS_Store

@@ -1,0 +1,507 @@
+<!doctype html>
+<html lang="nl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Lenffect administratie</title>
+<style>
+:root{--bg:#f4f4f6;--card:#fff;--tx:#1c1c1e;--mut:#6b6b70;--line:#e3e3e6;--acc:#0a7d4a;--accbg:#e2f3ea;--warn:#a85a00;--warnbg:#fff1dc;--bad:#c0262d;--badbg:#fde8e8;--blue:#1d5fd1;--bluebg:#e6eefc;--shadow:0 1px 2px rgba(0,0,0,.06)}
+@media (prefers-color-scheme:dark){:root{--bg:#141416;--card:#1e1e21;--tx:#f2f2f4;--mut:#9b9ba2;--line:#2f2f33;--acc:#4cc38a;--accbg:#13281e;--warn:#f0a94a;--warnbg:#2f2410;--bad:#ff7a80;--badbg:#341618;--blue:#7fa8ff;--bluebg:#18233d;--shadow:none}}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.45 -apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif}
+header{background:var(--card);border-bottom:1px solid var(--line);position:sticky;top:0;z-index:5}
+.top{max-width:1180px;margin:0 auto;padding:10px 20px;display:flex;align-items:center;gap:18px;flex-wrap:wrap}
+.brand{font-weight:700;font-size:16px;margin-right:6px}
+nav{display:flex;gap:2px;flex-wrap:wrap}
+nav button{background:none;border:0;color:var(--mut);padding:7px 11px;border-radius:8px;font:inherit;cursor:pointer}
+nav button:hover{background:var(--bg)}nav button.on{background:var(--accbg);color:var(--acc);font-weight:600}
+main{max-width:1180px;margin:0 auto;padding:22px 20px 80px}
+h1{font-size:22px;margin:0}h2{font-size:15px;margin:26px 0 10px}
+.bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.bar .sp{flex:1}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px;box-shadow:var(--shadow)}
+.grid{display:grid;gap:14px}.g4{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}.g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.k{color:var(--mut);font-size:12px}.big{font-size:22px;font-weight:700;letter-spacing:-.3px}
+.row{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
+button.b,a.b{background:var(--tx);color:var(--bg);border:0;border-radius:8px;padding:8px 14px;font:600 13px inherit;cursor:pointer;text-decoration:none;display:inline-block}
+button.b.sec,a.b.sec{background:var(--card);color:var(--tx);border:1px solid var(--line)}
+button.b.red{background:var(--bad);color:#fff}button.lnk{background:none;border:0;color:var(--blue);cursor:pointer;font:inherit;padding:0}
+input,select,textarea{font:inherit;color:var(--tx);background:var(--card);border:1px solid var(--line);border-radius:8px;padding:7px 9px;width:100%}
+input[type=checkbox]{width:auto}input:focus,select:focus,textarea:focus{outline:2px solid var(--blue);outline-offset:-1px}
+.bar input,.bar select{width:auto}
+table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+th{font-size:11.5px;text-transform:uppercase;letter-spacing:.4px;color:var(--mut);text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);background:var(--bg)}
+td{padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}tr:last-child td{border-bottom:0}
+tbody tr.klik{cursor:pointer}tbody tr.klik:hover td{background:var(--bg)}
+.num{text-align:right;white-space:nowrap;font-variant-numeric:tabular-nums}.mut{color:var(--mut)}.sm{font-size:12px}
+.pos{color:var(--acc)}.neg{color:var(--bad)}
+.tag{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11.5px;font-weight:600;background:var(--bg);color:var(--mut);white-space:nowrap}
+.tag.ik{background:var(--accbg);color:var(--acc)}.tag.gedeeld{background:var(--bluebg);color:var(--blue)}.tag.jelmer{background:var(--warnbg);color:var(--warn)}
+.tag.flag{background:var(--warnbg);color:var(--warn)}.tag.bad{background:var(--badbg);color:var(--bad)}
+.note{padding:10px 12px;border-radius:10px;background:var(--warnbg);color:var(--warn);margin:6px 0;font-size:13px}
+.note.info{background:var(--bluebg);color:var(--blue)}.note.ok{background:var(--accbg);color:var(--acc)}
+.ov{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:flex-start;justify-content:center;padding:4vh 14px;overflow:auto;z-index:20}
+.md{background:var(--card);border-radius:14px;max-width:720px;width:100%;padding:22px;box-shadow:0 10px 40px rgba(0,0,0,.3)}.md.wide{max-width:900px}
+.md h3{margin:0 0 14px;font-size:17px}
+.fg{display:grid;grid-template-columns:repeat(6,1fr);gap:10px}.fg .c2{grid-column:span 2}.fg .c3{grid-column:span 3}.fg .c4{grid-column:span 4}.fg .c6{grid-column:span 6}
+label.f span{display:block;font-size:12px;color:var(--mut);margin-bottom:3px}
+.acts{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+.acts .l{margin-right:auto}
+.toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--tx);color:var(--bg);padding:10px 16px;border-radius:10px;z-index:40}
+details summary{cursor:pointer;color:var(--blue);font-size:12.5px}
+.rub td:first-child{width:60px;font-weight:700}.rub tr.tot td{font-weight:700;background:var(--bg)}
+.regel{display:grid;grid-template-columns:1.2fr 3fr .7fr .9fr .9fr 28px;gap:6px;margin-bottom:6px}
+.rv{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:start}.pv{position:sticky;top:0}.pv iframe,.pv img{width:100%;height:78vh;border:1px solid var(--line);border-radius:10px;object-fit:contain;background:#fff}.md.xl{max-width:1320px}
+.tag.ok{background:#dff3e4;color:#1d6b35}
+h3{font-size:14px;margin:18px 0 6px}
+.drop{border:2px dashed var(--line);text-align:center;padding:26px;cursor:pointer;border-radius:12px}.drop.over{border-color:var(--acc);background:var(--accbg)}
+@media(max-width:1000px){.rv{grid-template-columns:1fr}.pv{position:static}}
+@media(max-width:700px){.fg{grid-template-columns:1fr 1fr}.fg>*{grid-column:span 2!important}.regel{grid-template-columns:1fr 1fr}.hide-m{display:none}}
+@media print{header,.bar,.noprint,.toast{display:none!important}body{background:#fff}main{padding:0}.card,table{box-shadow:none}}
+</style>
+</head>
+<body>
+<header><div class="top"><div class="brand">Lenffect administratie</div>
+<nav id="nav"></nav></div></header>
+<main id="main"></main>
+<script>
+const $=(s,e=document)=>e.querySelector(s), $$=(s,e=document)=>[...e.querySelectorAll(s)];
+const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const EUR=new Intl.NumberFormat('nl-NL',{style:'currency',currency:'EUR'});
+const eur=n=>EUR.format(Number(n||0));
+const dat=s=>s?s.split('-').reverse().join('-'):'';
+const today=()=>new Date().toISOString().slice(0,10);
+const SOORT={inkomst:'Inkomst',kosten:'Kosten',prive_uitgave:'Privé-uitgave',storting:'Storting (privé → zakelijk)',btw_betaling:'Btw-betaling',overboeking:'Overboeking ING → Wise',overige_baten:'Overige opbrengst (geen btw, bijv. bankbonus)',btw_teruggave:'Btw-teruggave ontvangen'};
+const BTWS={nl21:'NL 21%',nl9:'NL 9%',nl0:'0% / geen btw (omzet)',eu_verlegd:'EU – btw verlegd (4b)',buiten_eu_verlegd:'Buiten EU – btw verlegd (4a)',buitenlandse_btw:'Buitenlandse btw (niet aftrekbaar)',geen:'Geen btw'};
+const REK={ing:'Zakelijk (ING)',wise:'Wise-kaart',prive:'Privé betaald (voorgeschoten)'};
+const state={page:'dashboard',jaar:new Date().getFullYear(),relaties:[],instellingen:{}};
+let cache={};
+
+async function api(m,u,b){
+  const r=await fetch('/api/'+u,{method:m,headers:{'Content-Type':'application/json'},body:b?JSON.stringify(b):undefined});
+  const j=await r.json().catch(()=>({}));
+  if(!r.ok){toast(j.fout||'Er ging iets mis');throw new Error(j.fout||r.status)}
+  return j;
+}
+function toast(t){const e=document.createElement('div');e.className='toast';e.textContent=t;document.body.append(e);setTimeout(()=>e.remove(),3200)}
+function tag(b){
+  if(b.soort!=='inkomst'&&b.soort!=='kosten')return '';
+  if(b.toewijzing==='gedeeld')return `<span class="tag gedeeld">Gedeeld · ik ${+b.pct_ik}%</span>`;
+  if(b.toewijzing==='jelmer')return '<span class="tag jelmer">Jelmer</span>';
+  return '<span class="tag ik">Ik</span>';
+}
+function modal(html,wide,cls){
+  const o=document.createElement('div');o.className='ov';
+  o.innerHTML=`<div class="md ${wide?'wide':''} ${cls||''}">${html}</div>`;
+  const close=()=>{o.remove();document.removeEventListener('keydown',esc_)};
+  const esc_=e=>{if(e.key==='Escape')close()};
+  o.addEventListener('mousedown',e=>{if(e.target===o)close()});
+  document.addEventListener('keydown',esc_);
+  document.body.append(o);o.close=close;return o;
+}
+function val(el,n){const x=el.querySelector(`[name=${n}]`);return x?(x.type==='checkbox'?x.checked:x.value):undefined}
+function setv(el,o){for(const [k,v] of Object.entries(o)){const x=el.querySelector(`[name=${k}]`);if(!x)continue;if(x.type==='checkbox')x.checked=!!v;else x.value=v??''}}
+const opts=(o,sel)=>Object.entries(o).map(([k,v])=>`<option value="${k}" ${k===sel?'selected':''}>${esc(v)}</option>`).join('');
+const yearOpts=(sel)=>[2025,2026,2027,2028].map(y=>`<option ${y==sel?'selected':''}>${y}</option>`).join('');
+function lastQ(){const d=new Date();let q=Math.floor(d.getMonth()/3)+1,y=d.getFullYear();q--;if(!q){q=4;y--}return{y,q}}
+
+/* ------------------------------------------------ navigatie */
+const PAGES=[['dashboard','Overzicht'],['inbox','Inbox'],['bank','Bank afstemmen'],['boekingen','Boekingen'],['btw','Btw-aangifte'],['verrekening','Verrekening Jelmer'],['facturen','Facturen'],['abonnementen','Abonnementen'],['relaties','Klanten & leveranciers'],['instellingen','Instellingen']];
+function nav(){
+  $('#nav').innerHTML=PAGES.map(([k,t])=>`<button class="${state.page===k?'on':''}" data-p="${k}">${t}${k==='inbox'&&state.inboxN?` <span class="tag flag">${state.inboxN}</span>`:''}</button>`).join('');
+  $$('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.p));
+}
+async function go(p){state.page=p;nav();$('#main').innerHTML='<p class="mut">Laden…</p>';window.scrollTo(0,0);
+  state.relaties=await api('GET','relaties');state.instellingen=await api('GET','instellingen');
+  const ib=await api('GET','inbox');state.inboxN=ib.bestanden.length+ib.concepten.length;nav();
+  await ({dashboard,inbox,bank,boekingen,btw,verrekening,facturen,abonnementen,relaties,instellingen}[p])();}
+
+
+/* ------------------------------------------------ bank afstemmen */
+async function bank(){
+  $('#main').innerHTML=`<div class="bar"><h1>Bank afstemmen</h1></div>
+  <div class="drop" id="bz"><b>Sleep je bankafschriften (csv) hierheen</b> <span class="mut">of klik om te kiezen</span>
+   <div class="k" style="margin-top:6px">ING: Mijn ING → Zakelijk → Af- en bijschrijvingen → downloaden als csv. Wise: Rekeningafschriften → csv (EUR). Je kunt meerdere bestanden tegelijk kiezen. Er wordt niets automatisch geboekt; jij beslist per regel.</div>
+   <input type="file" id="bf" multiple accept=".csv" hidden></div><div id="bres"></div>`;
+  const dz=$('#bz'),fi=$('#bf');
+  dz.onclick=()=>fi.click();
+  dz.ondragover=e=>{e.preventDefault();dz.classList.add('over')};dz.ondragleave=()=>dz.classList.remove('over');
+  dz.ondrop=e=>{e.preventDefault();dz.classList.remove('over');bankLees(e.dataTransfer.files)};
+  fi.onchange=()=>bankLees(fi.files);
+}
+async function bankLees(files){
+  const bestanden=[];
+  for(const f of files)bestanden.push({naam:f.name,tekst:await f.text()});
+  $('#bres').innerHTML='<p class="mut">Afstemmen…</p>';
+  try{state.bank=await api('POST','bank/analyse',{bestanden});}catch(e){$('#bres').innerHTML='';return}
+  bankToon();
+}
+function bankToon(){
+  const r=state.bank,NAAM={ing:'ING zakelijk',wise:'Wise-kaart'};let h=r.waarschuwingen.length?`<div class="note info">${r.waarschuwingen.map(esc).join('<br>')}</div>`:'';
+  for(const [k,a] of Object.entries(r.rekeningen)){
+    const klopt=Math.abs(a.saldo_verschil)<0.01;
+    h+=`<h2>${NAAM[k]}</h2><div class="card"><div class="row"><span class="k">Periode in het bestand</span><span>${dat(a.van)} t/m ${dat(a.tot)} · ${a.aantal} regels</span></div>
+     <div class="row"><span class="k">Saldo volgens bank (${dat(a.saldo_datum)})</span><b>${eur(a.saldo_bank)}</b></div>
+     <div class="row"><span class="k">Saldo volgens administratie</span><span>${eur(a.saldo_app)}</span></div>
+     <div class="row"><span class="k">Verschil</span>${klopt?'<span class="tag ok">klopt</span>':`<b class="neg">${eur(a.saldo_verschil)}</b>`}</div>
+     <div class="row"><span class="k">Gekoppeld aan boekingen</span><span>${a.gekoppeld} regels${a.terugboekingen?` · ${a.terugboekingen} regels die elkaar opheffen (terugboeking)`:''}</span></div>
+     ${k==='ing'?`<div style="margin-top:8px"><button class="b sec" onclick="bankSaldo(${a.saldo_bank},'${a.saldo_datum}')">Dit bedrag bewaren als werkelijk ING-saldo</button></div>`:''}</div>`;
+    if(a.nieuw.length)h+=`<h3>Regels die nog niet in de administratie staan (${a.nieuw.length})</h3><table><thead><tr><th>Datum</th><th>Partij / omschrijving</th><th class="num">Bedrag</th><th></th></tr></thead><tbody>${a.nieuw.map((x,i)=>`<tr><td>${dat(x.datum)}</td><td>${esc(x.tegenpartij)}<div class="k">${esc((x.omschrijving||'').slice(0,110))}</div></td><td class="num">${eur(x.bedrag)}</td><td class="num"><button class="b sec" onclick="bankConcept('${k}',${i},'nieuw')">Maak concept</button></td></tr>`).join('')}</tbody></table><div class="k">Een concept komt in de Inbox; daar vul je soort, btw en bijlage in en keur je het goed.</div>`;
+    if(a.zakelijk_onbekend&&a.zakelijk_onbekend.length)h+=`<h3>Lijkt zakelijk, maar niet gevonden (${a.zakelijk_onbekend.length})</h3><table><tbody>${a.zakelijk_onbekend.map((x,i)=>`<tr><td>${dat(x.datum)}</td><td>${esc(x.tegenpartij)}</td><td class="num">${eur(x.bedrag)}</td><td class="num"><button class="b sec" onclick="bankConcept('${k}',${i},'zakelijk_onbekend')">Maak concept</button></td></tr>`).join('')}</tbody></table>`;
+    if(a.prive_maanden&&a.prive_maanden.length)h+=`<h3>Privé-uitgaven met de Wise-kaart per maand</h3><table><thead><tr><th>Maand</th><th class="num">Volgens bank</th><th class="num">In administratie</th><th class="num">Verschil</th><th></th></tr></thead><tbody>${a.prive_maanden.map((m,i)=>`<tr><td>${m.maand}</td><td class="num">${eur(m.bank)}</td><td class="num">${eur(m.administratie)}</td><td class="num">${Math.abs(m.verschil)<0.01?'<span class="tag ok">klopt</span>':`<b class="neg">${eur(m.verschil)}</b>`}</td><td class="num">${Math.abs(m.verschil)<0.01?'':`<button class="b sec" onclick="bankPrive(${i})">Verschil boeken als privé</button>`}</td></tr>`).join('')}</tbody></table><div class="k">Alles op de Wise-kaart wat niet bij een zakelijke boeking hoort, telt als privé.</div>`;
+    if(a.ontbreekt.length)h+=`<h3>In de administratie, maar niet op het afschrift (${a.ontbreekt.length})</h3><table><tbody>${a.ontbreekt.map(x=>`<tr class="klik" onclick="editBoeking(${x.id})"><td>${dat(x.datum)}</td><td>${esc(x.omschrijving)}</td><td class="num">${eur(x.bedrag)}</td></tr>`).join('')}</tbody></table><div class="k">Controleer datum, bedrag of rekening van deze boekingen.</div>`;
+  }
+  $('#bres').innerHTML=h||'<p class="mut">Geen bruikbare regels gevonden.</p>';
+}
+async function bankConcept(k,i,lijst){const x=state.bank.rekeningen[k][lijst][i];
+  const b=await api('POST','bank/concept',{rekening:k,datum:x.datum,bedrag:x.bedrag,tegenpartij:x.tegenpartij,omschrijving:x.omschrijving});
+  toast('Concept gemaakt – open het in de Inbox');state.bank.rekeningen[k][lijst].splice(i,1);bankToon();}
+async function bankPrive(i){const m=state.bank.rekeningen.wise.prive_maanden[i];
+  await api('POST','bank/prive',{maand:m.maand,datum:m.datum,bedrag:m.verschil});toast('Verschil geboekt');m.administratie=m.bank;m.verschil=0;bankToon();}
+async function bankSaldo(s,d){await api('POST','bank/saldo',{saldo:s,datum:d});toast('Werkelijk ING-saldo bewaard');}
+
+/* ------------------------------------------------ dashboard */
+async function dashboard(){
+  const d=await api('GET','dashboard?jaar='+state.jaar);
+  const kwk=d.kwartalen.map(k=>`<div class="card"><div class="row"><b>Q${k.kwartaal} ${d.jaar}</b><span class="k">aangifte vóór ${dat(k.deadline)}</span></div>
+   <div class="row"><span class="k">Omzet (ex. btw)</span><span>${eur(k.omzet)}</span></div>
+   <div class="row"><span class="k">Kosten (mijn deel)</span><span>${eur(k.kosten)}</span></div>
+   <div class="row"><span class="k">Winst voor belasting</span><b class="${k.winst<0?'neg':''}">${eur(k.winst)}</b></div>
+   <div class="row" style="border-top:1px solid var(--line);margin-top:6px;padding-top:8px"><span class="k">Btw ${k.btw_saldo>=0?'af te dragen':'terug te vragen'}</span><b>${eur(Math.abs(k.btw_saldo))}</b></div>
+   <div style="margin-top:6px"><button class="lnk" onclick="gaBtw(${d.jaar},${k.kwartaal})">Open btw-aangifte →</button></div></div>`).join('');
+  const tot=d.kwartalen.reduce((a,k)=>({o:a.o+k.omzet,k:a.k+k.kosten}),{o:0,k:0});
+  const open=d.open_facturen.map(b=>`<tr class="klik" onclick="editBoeking(${b.id})"><td>${esc(b.factuurnr)}</td><td>${esc(b.relatie)}</td><td>${dat(b.datum)}</td><td class="num">${eur(b.bedrag_excl+b.btw_bedrag)}</td><td>${b.te_laat?`<span class="tag bad">${b.dagen_open} dagen open</span>`:`<span class="tag">${b.dagen_open} dagen</span>`}</td></tr>`).join('');
+  const ctrl=d.te_controleren.map(b=>`<tr class="klik" onclick="editBoeking(${b.id})"><td>${dat(b.datum)}</td><td>${esc(b.omschrijving)}</td></tr>`).join('');
+  $('#main').innerHTML=`<div class="bar"><h1>Overzicht</h1><select id="jr" onchange="state.jaar=+this.value;go('dashboard')">${yearOpts(state.jaar)}</select><span class="sp"></span>
+   <button class="b sec" onclick="newBoeking('kosten')">+ Kosten</button><button class="b sec" onclick="newBoeking('inkomst')">+ Inkomst</button><button class="b" onclick="editFactuur()">+ Nieuwe factuur</button></div>
+   ${state.inboxN?`<div class="note" style="cursor:pointer" onclick="go('inbox')">In de Inbox wacht nog werk op je: ${state.inboxN} bestand(en)/concept(en). Concepten tellen pas mee na je goedkeuring →</div>`:''}
+   <div class="grid g4">${kwk}</div>
+   <div class="grid g4" style="margin-top:14px">
+    <div class="card"><div class="k">Omzet ${d.jaar} (ex. btw)</div><div class="big">${eur(tot.o)}</div></div>
+    <div class="card"><div class="k">Kosten ${d.jaar} (mijn deel)</div><div class="big">${eur(tot.k)}</div></div>
+    <div class="card"><div class="k">Wise-kaart saldo (berekend)</div><div class="big">${eur(d.wise_saldo)}</div><div class="k">stortingen − zakelijke kosten − privé</div></div>
+    <div class="card"><div class="row"><span class="k">Zakelijke rekening (ING)</span><button class="lnk" onclick="saldoModal()">saldo bijwerken</button></div><div class="big">${eur(d.ing_saldo)}</div><div class="k">berekend uit je boekingen</div>
+     ${d.ing_werkelijk!=null?`<div class="row sm" style="margin-top:6px"><span>Werkelijk (${dat(d.ing_datum)})</span><b>${eur(d.ing_werkelijk)}</b></div><div class="row sm"><span>Verschil met berekend</span><b class="${Math.abs(d.ing_werkelijk-d.ing_saldo)<0.01?'pos':'neg'}">${eur(d.ing_werkelijk-d.ing_saldo)}</b></div>
+     <div class="row sm" style="border-top:1px solid var(--line);margin-top:4px;padding-top:6px"><span>− btw-reserve (${d.btw_reserve_items.map(i=>'Q'+i.kwartaal).join(' + ')||'—'})</span><span>${eur(d.btw_reserve)}</span></div>
+     <div class="row sm"><span>− te betalen aan ${esc(state.instellingen.partner_contact||'Jelmer')}</span><span>${eur(d.schuld_jelmer)}</span></div>
+     <div class="row"><b>Vrij te besteden</b><b>${eur(d.vrij)}</b></div>`:'<div class="k" style="margin-top:6px">Vul je echte saldo in om het verschil en wat je vrij kunt besteden te zien.</div>'}</div></div>
+   <div class="grid g2"><div><h2>Openstaande facturen</h2>${open?`<table><thead><tr><th>Nr</th><th>Klant</th><th>Datum</th><th class="num">Bedrag incl.</th><th></th></tr></thead><tbody>${open}</tbody></table>`:'<div class="note ok">Alle facturen zijn betaald.</div>'}</div>
+   <div><h2>Even controleren (${d.te_controleren.length})</h2>${ctrl?`<table><tbody>${ctrl}</tbody></table>`:'<div class="note ok">Niets om te controleren.</div>'}</div></div>`;
+}
+function saldoModal(){
+  const s=state.instellingen;
+  const m=modal(`<h3>Saldo zakelijke rekening bijwerken</h3><form id="sf2" class="fg"><label class="f c3"><span>Saldo volgens je bank (€)</span><input type="number" step="0.01" name="ing_saldo_werkelijk"></label><label class="f c3"><span>Per datum</span><input type="date" name="ing_saldo_datum"></label>
+   <label class="f c6"><span>Btw tot en met dit kwartaal is al betaald (bijv. 2026-Q2)</span><input name="btw_betaald_t_m"></label></form>
+   <div class="acts"><button class="b sec" id="cn">Annuleren</button><button class="b" id="ok">Opslaan</button></div>`);
+  const f=$('#sf2',m);setv(f,{ing_saldo_werkelijk:s.ing_saldo_werkelijk,ing_saldo_datum:s.ing_saldo_datum||today(),btw_betaald_t_m:s.btw_betaald_t_m});
+  $('#cn',m).onclick=m.close;
+  $('#ok',m).onclick=async()=>{const d={};$$('[name]',f).forEach(x=>d[x.name]=x.value);await api('PUT','instellingen',d);m.close();go('dashboard')};
+}
+function gaBtw(j,k){state.btwSel={y:j,q:k};go('btw')}
+
+/* ------------------------------------------------ inbox */
+async function inbox(){
+  const d=await api('GET','inbox');cache.inbox=d;
+  $('#main').innerHTML=`<div class="bar"><h1>Inbox</h1></div>
+  <div class="drop" id="dz"><b>Sleep facturen hierheen</b> <span class="mut">of klik om te kiezen (pdf, jpg, png)</span>
+   <div class="k" style="margin-top:6px">Je kunt bestanden ook rechtstreeks in de map <code>inbox</code> naast dit programma zetten. Zeg daarna tegen Claude: "verwerk de inbox". Die maakt er concepten van die jij hier controleert.</div>
+   <input type="file" id="fi" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.heic" hidden></div>
+  <h2>Concepten om te controleren (${d.concepten.length})</h2>
+  ${d.concepten.length?`<table><thead><tr><th>Datum</th><th>Omschrijving</th><th class="num">Excl.</th><th class="num">Btw</th><th>Btw-soort</th><th>Van wie</th><th></th></tr></thead><tbody>${d.concepten.map(b=>`<tr class="klik" onclick="editBoeking(${b.id})"><td>${dat(b.datum)}</td><td>${esc(b.omschrijving)}<div class="k">${esc(b.relatie)}${b.bijlage?' · 📎 '+esc(b.bijlage.split('/').pop()):''}</div></td><td class="num">${eur(b.bedrag_excl)}</td><td class="num">${eur(b.btw_bedrag)}</td><td class="sm">${BTWS[b.btw_soort]}</td><td>${tag(b)}</td><td>${b.mogelijk_dubbel.length?'<span class="tag bad">mogelijk dubbel</span>':''} ${b.controleren?'<span class="tag flag">controleren</span>':''}</td></tr>`).join('')}</tbody></table><p class="k">Klik een concept open: links zie je de factuur, rechts de ingevulde gegevens. Pas aan wat niet klopt en klik op Goedkeuren. Pas dan telt hij mee in je btw en overzicht.</p>`:'<div class="note ok">Geen concepten die op controle wachten.</div>'}
+  <h2>Nog te verwerken bestanden (${d.bestanden.length})</h2>
+  ${d.bestanden.length?`<table><thead><tr><th>Bestand</th><th>Toegevoegd</th><th class="num">Grootte</th><th></th></tr></thead><tbody>${d.bestanden.map((f,i)=>`<tr><td><a href="/inbox/${encodeURIComponent(f.naam)}" target="_blank">${esc(f.naam)}</a></td><td class="sm">${f.datum}</td><td class="num sm">${Math.round(f.grootte/1024)} kB</td><td class="num"><button class="b sec" onclick="maakUitInbox(${i})">Zelf boeking maken</button></td></tr>`).join('')}</tbody></table>`:'<div class="note info">De inbox is leeg.</div>'}`;
+  const dz=$('#dz'),fi=$('#fi');
+  dz.onclick=()=>fi.click();fi.onchange=()=>uploadFiles(fi.files);
+  dz.ondragover=e=>{e.preventDefault();dz.classList.add('over')};dz.ondragleave=()=>dz.classList.remove('over');
+  dz.ondrop=e=>{e.preventDefault();dz.classList.remove('over');uploadFiles(e.dataTransfer.files)};
+}
+async function uploadFiles(files){
+  for(const f of files){const r=await fetch('/api/inbox/upload',{method:'POST',headers:{'X-Filename':encodeURIComponent(f.name)},body:f});
+    if(!r.ok){toast((await r.json()).fout||'Upload mislukt')}}
+  toast('Geüpload');go('inbox');
+}
+function maakUitInbox(i){openBoeking({soort:'kosten',datum:today(),toewijzing:'ik',pct_ik:100,btw_soort:'nl21',rekening:'ing',betaald:1,inbox_bestand:cache.inbox.bestanden[i].naam})}
+
+/* ------------------------------------------------ boekingen */
+const bf={kwartaal:'',soort:'',wie:'',zoek:''};
+async function boekingen(){
+  const l=await api('GET','boekingen?jaar='+state.jaar+(bf.kwartaal?'&kwartaal='+bf.kwartaal:''));
+  cache.boekingen=l;
+  const z=bf.zoek.toLowerCase();
+  const rows=l.filter(b=>(!bf.soort||b.soort===bf.soort)&&(!bf.wie||b.toewijzing===bf.wie)&&(!z||(b.omschrijving+b.relatie+b.factuurnr+b.categorie).toLowerCase().includes(z)));
+  const sum=(s,f)=>rows.filter(b=>b.soort===s).reduce((a,b)=>a+f(b),0);
+  $('#main').innerHTML=`<div class="bar"><h1>Boekingen</h1><span class="sp"></span><button class="b sec" onclick="newBoeking('kosten')">+ Kosten</button><button class="b sec" onclick="newBoeking('inkomst')">+ Inkomst</button><button class="b sec" onclick="newBoeking('prive_uitgave')">+ Privé / storting / btw-betaling</button></div>
+  <div class="bar"><select onchange="state.jaar=+this.value;go('boekingen')">${yearOpts(state.jaar)}</select>
+   <select onchange="bf.kwartaal=this.value;go('boekingen')"><option value="">Heel jaar</option>${[1,2,3,4].map(q=>`<option value="${q}" ${bf.kwartaal==q?'selected':''}>Q${q}</option>`).join('')}</select>
+   <select onchange="bf.soort=this.value;boekingen()"><option value="">Alle soorten</option>${opts(SOORT,bf.soort)}</select>
+   <select onchange="bf.wie=this.value;boekingen()"><option value="">Van wie: iedereen</option><option value="ik" ${bf.wie==='ik'?'selected':''}>Alleen ik</option><option value="gedeeld" ${bf.wie==='gedeeld'?'selected':''}>Gedeeld</option><option value="jelmer" ${bf.wie==='jelmer'?'selected':''}>Jelmer</option></select>
+   <input placeholder="Zoeken…" value="${esc(bf.zoek)}" oninput="bf.zoek=this.value;clearTimeout(window._t);window._t=setTimeout(()=>{boekingen().then(()=>{const i=$('.bar input');i.focus();i.setSelectionRange(99,99)})},250)"></div>
+  <table><thead><tr><th>Datum</th><th>Omschrijving</th><th>Soort</th><th class="num">Excl.</th><th class="num">Btw</th><th class="num">Totaal</th><th>Van wie</th><th>Betaald</th></tr></thead><tbody>
+  ${rows.map(b=>`<tr class="klik" onclick="editBoeking(${b.id})"><td class="num">${dat(b.datum)}</td>
+   <td>${b.status==='concept'?'<span class="tag bad">concept</span> ':''}${esc(b.omschrijving)}${b.bijlage?' 📎':''}${b.controleren?' <span class="tag flag">controleren</span>':''}<div class="k">${esc(b.relatie)}${b.categorie?' · '+esc(b.categorie):''}${b.rekening==='wise'?' · Wise':''}</div></td>
+   <td class="sm">${SOORT[b.soort]}</td><td class="num ${b.soort==='inkomst'?'pos':''}">${eur(b.bedrag_excl)}</td><td class="num mut">${b.btw_bedrag?eur(b.btw_bedrag):(['eu_verlegd','buiten_eu_verlegd'].includes(b.btw_soort)?'verlegd':'')}</td>
+   <td class="num">${eur(b.bedrag_excl+b.btw_bedrag)}</td><td>${tag(b)}</td>
+   <td onclick="event.stopPropagation()">${['inkomst','kosten'].includes(b.soort)?`<input type="checkbox" ${b.betaald?'checked':''} onchange="betaald(${b.id},this.checked)">`:''}</td></tr>`).join('')||'<tr><td colspan=8 class="mut">Geen boekingen gevonden.</td></tr>'}</tbody></table>
+  <p class="k">${rows.length} boekingen · inkomsten ${eur(sum('inkomst',b=>b.bedrag_excl))} excl. · kosten ${eur(sum('kosten',b=>b.bedrag_excl))} excl. (volledig, niet alleen mijn deel)</p>`;
+}
+async function betaald(id,v){await api('PUT','boekingen/'+id,{betaald:v?1:0,betaaldatum:v?today():null});toast(v?'Als betaald gemarkeerd':'Als openstaand gemarkeerd');}
+function newBoeking(soort){openBoeking({soort,datum:today(),toewijzing:'ik',pct_ik:100,btw_soort:soort==='inkomst'?'nl21':'nl21',rekening:'ing',betaald:soort==='inkomst'?0:1})}
+async function editBoeking(id){openBoeking(await api('GET','boekingen/'+id))}
+function wrapRv(pv,html){
+  if(!pv)return html;const img=/\.(png|jpe?g|webp)$/i.test(pv.naam);
+  return `<div class="rv"><div class="pv"><div class="k" style="margin-bottom:4px">${esc(pv.naam)} · <a href="${pv.url}" target="_blank">open in nieuw tabblad</a></div>${img?`<img src="${pv.url}">`:`<iframe src="${pv.url}"></iframe>`}</div><div>${html}</div></div>`;
+}
+async function nextConcept(){const d=await api('GET','inbox');if(d.concepten.length){toast('Volgende concept…');openBoeking(d.concepten[0])}else go('inbox')}
+function openBoeking(b){
+  const nieuw=!b.id;
+  const isC=b.status==='concept';
+  const pv=b.inbox_bestand?{url:'/inbox/'+encodeURIComponent(b.inbox_bestand),naam:b.inbox_bestand}:(b.bijlage?{url:'/bijlage/'+b.id,naam:b.bijlage.split('/').pop()}:null);
+  const rel=state.relaties.map(r=>`<option value="${esc(r.naam)}">`).join('');
+  const cats=['Omzet','Software & abonnementen','Hosting & domeinen','Onderaanneming JPPW','Oprichting','Overig','Privé',...new Set((cache.boekingen||[]).map(x=>x.categorie).filter(Boolean))];
+  const m=modal(wrapRv(pv,`<h3>${isC?'Concept controleren':(nieuw?'Nieuwe boeking':'Boeking bewerken')}</h3>${b.mogelijk_dubbel&&b.mogelijk_dubbel.length?`<div class="note">Let op: lijkt op een bestaande boeking (${b.mogelijk_dubbel.map(x=>esc(x.omschrijving)+' '+dat(x.datum)).join(', ')}). Mogelijk dubbel.</div>`:''}<form id="bf" class="fg">
+   <label class="f c2"><span>Soort</span><select name="soort">${opts(SOORT,b.soort)}</select></label>
+   <label class="f c2"><span>Datum (factuurdatum)</span><input type="date" name="datum" required></label>
+   <label class="f c2"><span>Rekening</span><select name="rekening">${opts(REK,b.rekening)}</select></label>
+   <label class="f c4"><span>Omschrijving</span><input name="omschrijving" required></label>
+   <label class="f c2"><span>Factuurnummer</span><input name="factuurnr"></label>
+   <label class="f c3"><span>Klant / leverancier</span><input name="relatie" list="rl"><datalist id="rl">${rel}</datalist></label>
+   <label class="f c3"><span>Categorie</span><input name="categorie" list="cl"><datalist id="cl">${[...new Set(cats)].map(c=>`<option value="${esc(c)}">`).join('')}</datalist></label>
+   <label class="f c2 vbtw"><span>Btw-soort</span><select name="btw_soort">${opts(BTWS,b.btw_soort)}</select></label>
+   <label class="f c2"><span id="lx">Bedrag excl. btw</span><input type="number" step="0.01" name="bedrag_excl"></label>
+   <label class="f c2 vbtw"><span>Btw-bedrag op factuur</span><input type="number" step="0.01" name="btw_bedrag"></label>
+   <label class="f c2 vbtw"><span>Totaal incl. btw (invulhulp)</span><input type="number" step="0.01" name="incl"></label>
+   <div class="c6 vbtw" id="verl" style="display:none"></div>
+   <label class="f c3 vwie"><span>Van wie is dit?</span><select name="toewijzing"><option value="ik">Alleen van mij</option><option value="gedeeld">Gedeeld met Jelmer</option><option value="jelmer">Alleen van Jelmer</option></select></label>
+   <label class="f c3 vwie" id="pctw"><span>Mijn aandeel (%)</span><input type="number" step="1" min="0" max="100" name="pct_ik"></label>
+   <label class="f c2"><span><input type="checkbox" name="betaald"> Betaald</span><input type="date" name="betaaldatum"></label>
+   <label class="f c2"><span><input type="checkbox" name="controleren"> Markeer: controleren</span></label>
+   <label class="f c6"><span>Notitie</span><textarea name="notitie" rows="2"></textarea></label>
+  </form>
+  <div class="acts">${nieuw?'':'<button class="b red l" id="del">Verwijderen</button>'}<button class="b sec" id="cn">Annuleren</button>${isC?'<button class="b sec" id="okc">Opslaan als concept</button><button class="b" id="ok">Goedkeuren</button>':'<button class="b" id="ok">Opslaan</button>'}</div>`),!!pv,pv?'xl':'');
+  const f=$('#bf',m);
+  setv(f,{...b,incl:b.id?+(b.bedrag_excl+b.btw_bedrag).toFixed(2):''});
+  const rate=()=>({nl21:.21,nl9:.09})[val(f,'btw_soort')];
+  const sync=()=>{
+    const s=val(f,'soort'),pr=['prive_uitgave','storting','btw_betaling','overboeking','overige_baten','btw_teruggave'].includes(s);
+    $$('.vbtw,.vwie',f).forEach(e=>e.style.display=pr?'none':'');
+    $('#lx',f).textContent=pr?'Bedrag':'Bedrag excl. btw';
+    $('#pctw',f).style.display=(pr||val(f,'toewijzing')!=='gedeeld')?'none':'';
+    if(val(f,'toewijzing')==='gedeeld'&&!+val(f,'pct_ik'))f.pct_ik.value=50;
+    const bs=val(f,'btw_soort');const v=$('#verl',f);
+    if(!pr&&(bs==='eu_verlegd'||bs==='buiten_eu_verlegd')){v.style.display='';v.innerHTML='<div class="note info">Btw verlegd: de factuur heeft geen btw. In de aangifte komt dit onder rubriek '+(bs==='eu_verlegd'?'4b':'4a')+' en wordt dezelfde btw weer als voorbelasting afgetrokken (netto € 0).</div>'}
+    else if(!pr&&bs==='buitenlandse_btw'){v.style.display='';v.innerHTML='<div class="note info">Btw van een buitenlandse leverancier is niet aftrekbaar in je Nederlandse aangifte. Het bedrag telt mee als kosten.</div>'}
+    else{v.style.display='none'}
+    if(!pr&&s!=='inkomst'&&(b.soort==='kosten'&&val(f,'toewijzing')!=='ik')){}
+  };
+  f.addEventListener('input',e=>{
+    const n=e.target.name,r=rate(),ex=+val(f,'bedrag_excl')||0;
+    if(n==='incl'&&r){const i=+val(f,'incl')||0;f.bedrag_excl.value=(i/(1+r)).toFixed(2);f.btw_bedrag.value=(i-i/(1+r)).toFixed(2)}
+    else if(n==='incl'){f.bedrag_excl.value=val(f,'incl');f.btw_bedrag.value=0}
+    else if(n==='bedrag_excl'){if(r)f.btw_bedrag.value=(ex*r).toFixed(2);f.incl.value=(ex+(+f.btw_bedrag.value||0)).toFixed(2)}
+    else if(n==='btw_bedrag'){f.incl.value=(ex+(+f.btw_bedrag.value||0)).toFixed(2)}
+    else if(n==='btw_soort'){if(r)f.btw_bedrag.value=(ex*r).toFixed(2);else if(['eu_verlegd','buiten_eu_verlegd','geen','nl0'].includes(val(f,'btw_soort')))f.btw_bedrag.value=0;f.incl.value=(ex+(+f.btw_bedrag.value||0)).toFixed(2)}
+    sync();
+  });
+  sync();
+  $('#cn',m).onclick=m.close;
+  const save=async(status)=>{
+    if(!f.reportValidity())return;
+    const d={};['soort','datum','rekening','omschrijving','factuurnr','relatie','categorie','btw_soort','bedrag_excl','btw_bedrag','toewijzing','pct_ik','betaald','betaaldatum','controleren','notitie'].forEach(k=>d[k]=val(f,k));
+    d.factuur_id=b.factuur_id;d.abonnement_id=b.abonnement_id;d.bijlage=b.bijlage||'';d.inbox_bestand=b.inbox_bestand||'';d.status=status;
+    if(b.id)await api('PUT','boekingen/'+b.id,d);else await api('POST','boekingen',d);
+    m.close();
+    if(isC&&status==='definitief'){toast('Goedgekeurd');nextConcept()}else{toast('Opgeslagen');go(state.page)}
+  };
+  $('#ok',m).onclick=()=>save('definitief');
+  if(isC)$('#okc',m).onclick=()=>save('concept');
+  if(!nieuw)$('#del',m).onclick=async()=>{if(!confirm('Deze boeking verwijderen?'))return;await api('DELETE','boekingen/'+b.id);m.close();go(state.page)};
+}
+
+/* ------------------------------------------------ btw */
+async function btw(){
+  const sel=state.btwSel||(()=>{const l=lastQ();return{y:l.y,q:l.q}})();state.btwSel=sel;
+  const d=await api('GET',`btw?jaar=${sel.y}&kwartaal=${sel.q}`);
+  const rub=d.rubrieken.filter(r=>r.rubriek!=='5b');
+  const r5=d.rubrieken.find(r=>r.rubriek==='5b');
+  const line=r=>`<tr class="${r.regels.length?'':'mut'}"><td>${r.rubriek}</td><td>${esc(r.omschrijving)}${r.regels.length?`<details><summary>${r.regels.length} boekingen</summary><table style="margin-top:6px">${r.regels.map(x=>`<tr class="klik" onclick="editBoeking(${x.id})"><td style="width:92px">${dat(x.datum)}</td><td>${esc(x.omschrijving)}</td><td class="num">${eur(x.grondslag)}</td><td class="num">${eur(x.btw)}</td></tr>`).join('')}</table></details>`:''}</td>
+    <td class="num">${r.rubriek==='5b'?'':'€ '+r.grondslag_hele_euros.toLocaleString('nl-NL')}${r.rubriek==='5b'?'':`<div class="k">${eur(r.grondslag)}</div>`}</td><td class="num">${r.rubriek==='1e'?'':eur(r.btw)}</td></tr>`;
+  const dl=new Date(d.deadline);const dagen=Math.ceil((dl-new Date())/864e5);
+  $('#main').innerHTML=`<div class="bar"><h1>Btw-aangifte</h1><select onchange="state.btwSel.y=+this.value;btw()">${yearOpts(sel.y)}</select>
+   <select onchange="state.btwSel.q=+this.value;btw()">${[1,2,3,4].map(q=>`<option value="${q}" ${q==sel.q?'selected':''}>Kwartaal ${q}</option>`).join('')}</select><span class="sp"></span>
+   <button class="b sec" onclick="csvBtw()">Exporteer CSV</button><button class="b sec" onclick="window.print()">Afdrukken</button></div>
+  <div class="note ${dagen<0?'':'info'}">Periode ${dat(d.van)} t/m ${dat(d.tot)} · uiterlijk aangifte en betalen op <b>${dat(d.deadline)}</b>${dagen>=0?` (nog ${dagen} dagen)`:' (verstreken)'} · gerekend op <b>${d.stelsel}</b> (aan te passen bij Instellingen)</div>
+  <div class="card" style="margin-top:12px"><table class="rub"><thead><tr><th>Rubriek</th><th>Omschrijving</th><th class="num">Omzet / grondslag (hele euro's)</th><th class="num">Btw</th></tr></thead><tbody>
+   ${rub.map(line).join('')}
+   <tr class="tot"><td>5a</td><td>Verschuldigde btw (1a + 1b + 4a + 4b)</td><td></td><td class="num">${eur(d.verschuldigd_5a)}</td></tr>
+   ${line(r5)}
+   <tr class="tot"><td>5g</td><td>${d.saldo_5g>=0?'Totaal: te betalen aan de Belastingdienst':'Totaal: terug te vragen'}</td><td></td><td class="num ${d.saldo_5g>=0?'':'pos'}" style="font-size:16px">${eur(Math.abs(d.saldo_5g))}</td></tr></tbody></table></div>
+  ${d.waarschuwingen.length?'<h2>Controleer vóór je indient</h2>'+d.waarschuwingen.map(w=>`<div class="note klik" onclick="editBoeking(${w.id})" style="cursor:pointer">${esc(w.tekst)}</div>`).join(''):'<div class="note ok">Geen aandachtspunten voor dit kwartaal.</div>'}
+  <p class="k">Zo gebruik je dit: log in bij Mijn Belastingdienst Zakelijk → Btw → aangifte, en neem de bedragen per rubriek over. Omzet-/grondslagbedragen vul je af op hele euro's in; btw-bedragen met centen. Bij gedeelde kosten tel ik alleen jouw aandeel van de voorbelasting mee. De app berekent, jij blijft verantwoordelijk voor de aangifte; laat twijfelgevallen (bijv. buitenlandse btw) door je boekhouder controleren.</p>`;
+  window._btw=d;
+}
+function csvBtw(){const d=window._btw;const rows=[['Rubriek','Omschrijving','Grondslag','Btw']];d.rubrieken.forEach(r=>rows.push([r.rubriek,r.omschrijving,r.grondslag,r.btw]));rows.push(['5a','Verschuldigde btw','',d.verschuldigd_5a],['5g','Saldo (positief = betalen)','',d.saldo_5g]);
+  d.rubrieken.forEach(r=>r.regels.forEach(x=>rows.push(['  '+r.rubriek,x.datum+' '+x.omschrijving,x.grondslag,x.btw])));
+  const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
+  const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'}));a.download=`btw-${d.jaar}-Q${d.kwartaal}.csv`;a.click();}
+
+/* ------------------------------------------------ verrekening */
+async function verrekening(){
+  const j=state.vjaar||'';
+  const d=await api('GET','verrekening'+(j?`?van=${j}-01-01&tot=${j}-12-31`:''));
+  const nm=state.instellingen.partner_contact||'Jelmer';
+  const s=d.netto_nog_te_factureren_incl;
+  $('#main').innerHTML=`<div class="bar"><h1>Verrekening met ${esc(nm)}</h1><select onchange="state.vjaar=this.value;verrekening()"><option value="">Alle jaren</option>${[2025,2026,2027].map(y=>`<option ${j==y?'selected':''}>${y}</option>`).join('')}</select></div>
+  <div class="grid g2"><div class="card">
+   <div class="row"><span>${esc(nm)}s deel van omzet die klanten betaalden <span class="k">(incl. btw)</span></span><b>${eur(d.omzet_betaald_incl)}</b></div>
+   <div class="row"><span>− zijn deel van gedeelde kosten die jij betaalde</span><b>${eur(d.kosten_bruto)}</b></div>
+   <div class="row"><span>− facturen van ${esc(state.instellingen.partner_naam)} <span class="k">(waarvan ${eur(d.jppw_betaald_incl)} betaald, ${eur(d.jppw_open_incl)} open)</span></span><b>${eur(d.jppw_incl)}</b></div>
+   <div class="row" style="border-top:2px solid var(--tx);margin-top:6px;padding-top:8px"><b>${s>=0?'Hij mag nog factureren (incl. btw)':'Hij heeft al meer gefactureerd dan klanten tot nu toe betaalden (voorschot)'}</b><b class="${s<0?'':'pos'}" style="font-size:18px;${s<0?'color:var(--warn)':''}">${eur(Math.abs(s))}</b></div>
+   ${s>=0?`<div class="k">Ongeveer ${eur(d.netto_nog_te_factureren_excl)} excl. btw.</div>`:''}
+  </div><div class="card"><div class="k">Nog niet door klanten betaald (zijn deel, incl. btw)</div><div class="big">${eur(d.omzet_open_incl)}</div>
+   <p class="k">Zodra klanten deze facturen betalen, komt dit bedrag bij zijn saldo erbij. ${s<0?'Een voorschot aan hem wordt dan weer gedekt.':''}</p></div></div>
+  <h2>Gedeelde omzet</h2>${tbl(d.inkomsten,[['Datum',b=>dat(b.datum)],['Factuur',b=>esc(b.factuurnr)+' '+esc(b.relatie)],['Totaal incl.',b=>eur(b.bedrag_excl+b.btw_bedrag),1],['Zijn deel',b=>eur(b.jelmer_deel_incl),1],['Betaald',b=>b.betaald?'ja':'<span class="tag flag">open</span>']])}
+  <h2>Gedeelde kosten (zijn deel)</h2>${tbl(d.kosten,[['Datum',b=>dat(b.datum)],['Omschrijving',b=>esc(b.omschrijving)],['Totaal',b=>eur(b.bedrag_excl+b.btw_bedrag),1],['Zijn deel',b=>eur(b.jelmer_deel_bruto),1]],'Er zijn nog geen gedeelde kosten. Zet bij een kostenpost "Gedeeld met Jelmer" om hem hier te zien.')}
+  <h2>Facturen van ${esc(state.instellingen.partner_naam)}</h2>${tbl(d.jppw_facturen,[['Datum',b=>dat(b.datum)],['Factuur',b=>esc(b.omschrijving)],['Incl. btw',b=>eur(b.incl),1],['Betaald',b=>b.betaald?dat(b.betaaldatum):'<span class="tag flag">open</span>']])}
+  <p class="k">Regel: omzet van gezamenlijke klussen loopt volledig via jouw btw-aangifte. ${esc(nm)}s deel kom je terug als zijn factuur aan jou (kosten). Voor gedeelde kosten trek jij alleen de btw over jouw aandeel af.</p>`;
+}
+function tbl(rows,cols,leeg='Niets gevonden'){
+  if(!rows.length)return `<div class="note info">${leeg}</div>`;
+  return `<table><thead><tr>${cols.map(c=>`<th class="${c[2]?'num':''}">${c[0]}</th>`).join('')}</tr></thead><tbody>${rows.map(r=>`<tr class="klik" onclick="editBoeking(${r.id})">${cols.map(c=>`<td class="${c[2]?'num':''}">${c[1](r)}</td>`).join('')}</tr>`).join('')}</tbody></table>`;
+}
+
+/* ------------------------------------------------ facturen */
+async function facturen(){
+  const l=await api('GET','facturen');cache.facturen=l;
+  $('#main').innerHTML=`<div class="bar"><h1>Facturen</h1><span class="sp"></span><button class="b" onclick="editFactuur()">+ Nieuwe factuur</button></div>
+  <table><thead><tr><th>Nr</th><th>Datum</th><th>Klant</th><th>Omschrijving</th><th class="num">Excl.</th><th class="num">Incl.</th><th>Van wie</th><th>Betaald</th><th></th></tr></thead><tbody>
+  ${l.map(f=>`<tr><td><b>${esc(f.nummer)}</b></td><td>${dat(f.datum)}</td><td>${esc(f.klant.naam)}</td><td class="sm">${esc(f.regels[0]?.omschrijving||'')}</td><td class="num">${eur(f.excl)}</td><td class="num">${eur(f.totaal)}</td>
+   <td>${tag({soort:'inkomst',toewijzing:f.toewijzing,pct_ik:f.pct_ik})}</td>
+   <td>${f.betaald?`<span class="tag ik">${dat(f.betaaldatum)}</span>`:(f.vervaldatum<today()?'<span class="tag bad">te laat</span>':'<span class="tag flag">open</span>')} <input type="checkbox" ${f.betaald?'checked':''} onchange="betaald(${f.boeking_id},this.checked).then(()=>facturen())"></td>
+   <td style="white-space:nowrap"><a class="b sec" href="/factuur/${f.id}" target="_blank">PDF / print</a> <button class="lnk" onclick="editFactuur(${f.id})">bewerk</button> · <button class="lnk" onclick="editFactuur(${f.id},true)">kopieer</button></td></tr>`).join('')}</tbody></table>`;
+}
+async function editFactuur(id,kopie){
+  let f=id?await api('GET','facturen/'+id):{regels:[{}],btw_pct:21,termijn:+state.instellingen.betaaltermijn||14,onder:'fluid',datum:today(),toewijzing:'ik',pct_ik:100,klant:{}};
+  if(kopie){f={...f,id:null,datum:today(),betaald:0};f.regels=f.regels.map(r=>({...r}))}
+  if(!f.id)f.nummer=(await api('GET','facturen/volgend')).nummer;
+  const klanten=state.relaties.filter(r=>r.soort==='klant');
+  const m=modal(`<h3>${f.id?'Factuur '+esc(f.nummer)+' bewerken':'Nieuwe factuur'}</h3><form id="ff" class="fg">
+   <label class="f c3"><span>Klant</span><select name="relatie_id"><option value="">— kies klant —</option>${klanten.map(k=>`<option value="${k.id}" ${k.id==f.relatie_id?'selected':''}>${esc(k.naam)}</option>`).join('')}<option value="__nieuw__">+ Nieuwe klant…</option></select></label>
+   <label class="f c1"><span>Nummer</span><input name="nummer"></label>
+   <label class="f c2"><span>Factuurdatum</span><input type="date" name="datum"></label>
+   <div class="c6" id="nk" style="display:none"><div class="fg" style="grid-template-columns:repeat(6,1fr)">
+    <label class="f c3"><span>Bedrijfsnaam</span><input name="k_naam"></label><label class="f c3"><span>E-mail</span><input name="k_email"></label>
+    <label class="f c3"><span>Straat + nr</span><input name="k_adres"></label><label class="f c3"><span>Postcode, plaats</span><input name="k_plaats" placeholder="1111 XX, Stad - NL"></label>
+    <label class="f c3"><span>KvK</span><input name="k_kvk"></label><label class="f c3"><span>Btw-nr</span><input name="k_btw"></label></div></div>
+   <div class="c6"><div class="k" style="margin-bottom:4px">Regels</div><div id="regels"></div><button type="button" class="lnk" id="addr">+ regel toevoegen</button></div>
+   <label class="f c2"><span>Btw-tarief</span><select name="btw_pct"><option value="21">21%</option><option value="9">9%</option><option value="0">0%</option></select></label>
+   <label class="f c2"><span>Betaaltermijn (dagen)</span><input type="number" name="termijn"></label>
+   <label class="f c2"><span>Factuur onder</span><select name="onder"><option value="fluid">${esc(state.instellingen.handelsnaam)} (samenwerking, via ${esc(state.instellingen.bedrijfsnaam)})</option><option value="eigen">${esc(state.instellingen.bedrijfsnaam)} (alleen ik)</option></select></label>
+   <label class="f c3"><span>Van wie is deze omzet?</span><select name="toewijzing"><option value="ik">Alleen van mij</option><option value="gedeeld">Gedeeld met Jelmer</option><option value="jelmer">Alleen van Jelmer</option></select></label>
+   <label class="f c3" id="pw"><span>Mijn aandeel (%)</span><input type="number" name="pct_ik" min="0" max="100"></label>
+   <label class="f c6"><span>Betaallink (optioneel, komt op de factuur)</span><input name="betaallink" placeholder="https://…"></label>
+   <label class="f c6"><span>Opmerking onder de regels (optioneel)</span><textarea name="notitie" rows="2"></textarea></label>
+   <div class="c6" id="tot" style="text-align:right"></div></form>
+   <div class="acts">${f.id?'<button class="b red l" id="del">Verwijderen</button>':''}<button class="b sec" id="cn">Annuleren</button><button class="b sec" id="ok">Opslaan</button><button class="b" id="okv">Opslaan &amp; bekijken</button></div>`,true);
+  const form=$('#ff',m);
+  setv(form,{...f,btw_pct:String(f.btw_pct)});
+  const reg=$('#regels',m);
+  const addRegel=r=>{const d=document.createElement('div');d.className='regel';
+   d.innerHTML=`<input placeholder="Periode" data-k="periode"><input placeholder="Werkzaamheden" data-k="omschrijving"><input type="number" step="any" placeholder="Aantal" data-k="aantal"><input type="number" step="0.01" placeholder="Prijs" data-k="prijs"><input type="number" step="0.01" placeholder="Totaal" data-k="totaal"><button type="button" class="lnk" title="Verwijder">✕</button>`;
+   $$('input',d).forEach(i=>{i.value=r[i.dataset.k]??''});
+   if(r.prijs_tekst){d.dataset.pt=r.prijs_tekst;$('[data-k=prijs]',d).placeholder=r.prijs_tekst}
+   $('button',d).onclick=()=>{d.remove();tot()};reg.append(d)};
+  const regels=()=>$$('.regel',reg).map(d=>{const o={prijs_tekst:d.dataset.pt||''};$$('input',d).forEach(i=>o[i.dataset.k]=i.value);return o});
+  const tot=()=>{let t=0;$$('.regel',reg).forEach(d=>{const a=d.querySelector('[data-k=aantal]').value,p=d.querySelector('[data-k=prijs]').value,x=d.querySelector('[data-k=totaal]');
+     if(a!==''&&p!==''&&document.activeElement!==x&&!(d.dataset.manual)){x.value=(a*p).toFixed(2)}t+=+x.value||0});
+    const r=+val(form,'btw_pct');$('#tot',m).innerHTML=`<div class="k">Excl. ${eur(t)} · btw ${eur(t*r/100)}</div><div class="big">${eur(t*(1+r/100))}</div>`};
+  (f.regels.length?f.regels:[{}]).forEach(addRegel);
+  $('#addr',m).onclick=()=>addRegel({});
+  form.addEventListener('input',e=>{if(e.target.dataset.k==='totaal')e.target.closest('.regel').dataset.manual=1;
+    if(e.target.name==='relatie_id')$('#nk',m).style.display=e.target.value==='__nieuw__'?'':'none';
+    $('#pw',m).style.display=val(form,'toewijzing')==='gedeeld'?'':'none';
+    if(val(form,'toewijzing')==='gedeeld'&&!+val(form,'pct_ik'))form.pct_ik.value=50;tot()});
+  $('#pw',m).style.display=val(form,'toewijzing')==='gedeeld'?'':'none';tot();
+  $('#cn',m).onclick=m.close;
+  const save=async(view)=>{
+    let rid=val(form,'relatie_id');
+    if(rid==='__nieuw__'){
+      if(!val(form,'k_naam')){toast('Vul een bedrijfsnaam in');return}
+      const r=await api('POST','relaties',{naam:val(form,'k_naam'),soort:'klant',adres:val(form,'k_adres'),postcode_plaats:val(form,'k_plaats'),kvk:val(form,'k_kvk'),btw_nr:val(form,'k_btw'),email:val(form,'k_email'),std_btw_soort:'nl21'});rid=r.id}
+    if(!rid){toast('Kies een klant');return}
+    const body={relatie_id:+rid,nummer:val(form,'nummer'),datum:val(form,'datum'),regels:regels(),btw_pct:val(form,'btw_pct'),termijn:val(form,'termijn'),onder:val(form,'onder'),
+      toewijzing:val(form,'toewijzing'),pct_ik:val(form,'pct_ik'),betaallink:val(form,'betaallink'),notitie:val(form,'notitie')};
+    const res=f.id?await api('PUT','facturen/'+f.id,body):await api('POST','facturen',body);
+    m.close();toast('Factuur opgeslagen');if(view)window.open('/factuur/'+res.id,'_blank');go('facturen');
+  };
+  $('#ok',m).onclick=()=>save(false);$('#okv',m).onclick=()=>save(true);
+  if(f.id)$('#del',m).onclick=async()=>{if(!confirm('Factuur én bijbehorende boeking verwijderen?'))return;await api('DELETE','facturen/'+f.id);m.close();go('facturen')};
+}
+
+/* ------------------------------------------------ abonnementen */
+async function abonnementen(){
+  const l=await api('GET','abonnementen');cache.abo=l;
+  $('#main').innerHTML=`<div class="bar"><h1>Abonnementen</h1><span class="sp"></span><button class="b sec" onclick="genAbo()">Maak ontbrekende boekingen aan</button><button class="b" onclick="editAbo()">+ Abonnement</button></div>
+  <p class="k">Terugkerende kosten. Met de knop hierboven worden de boekingen tot vandaag aangemaakt. Abonnementen met een wisselend bedrag (koers, gebruik) krijgen de markering "controleren" zodat je het echte bedrag nog even invult.</p>
+  <table><thead><tr><th>Naam</th><th>Omschrijving</th><th class="num">Excl.</th><th>Btw</th><th>Van wie</th><th>Interval</th><th>Laatste</th><th>Actief</th></tr></thead><tbody>
+  ${l.map(a=>`<tr class="klik" onclick="editAbo(${a.id})"><td><b>${esc(a.naam)}</b></td><td class="sm">${esc(a.omschrijving)}</td><td class="num">${eur(a.bedrag_excl)}</td><td class="sm">${BTWS[a.btw_soort]}</td><td>${tag({soort:'kosten',toewijzing:a.toewijzing,pct_ik:a.pct_ik})}</td><td>${a.interval}</td><td>${dat(a.laatste_datum)}</td><td>${a.actief?'ja':'<span class="tag">gestopt</span>'}</td></tr>`).join('')}</tbody></table>`;
+}
+async function genAbo(){const n=await api('POST','abonnementen/genereer');toast(n.length?`${n.length} boeking(en) aangemaakt`:'Alles is al bijgewerkt')}
+function editAbo(id){
+  const a=id?cache.abo.find(x=>x.id===id):{naam:'',interval:'maandelijks',btw_soort:'nl21',toewijzing:'ik',pct_ik:100,rekening:'wise',actief:1,startdatum:today(),bedrag_excl:0,btw_bedrag:0,categorie:'Software & abonnementen'};
+  const m=modal(`<h3>${id?'Abonnement bewerken':'Nieuw abonnement'}</h3><form id="af" class="fg">
+   <label class="f c3"><span>Naam</span><input name="naam" required></label><label class="f c3"><span>Omschrijving</span><input name="omschrijving"></label>
+   <label class="f c2"><span>Bedrag excl. btw</span><input type="number" step="0.01" name="bedrag_excl"></label><label class="f c2"><span>Btw-bedrag</span><input type="number" step="0.01" name="btw_bedrag"></label>
+   <label class="f c2"><span>Btw-soort</span><select name="btw_soort">${opts(BTWS,a.btw_soort)}</select></label>
+   <label class="f c2"><span>Interval</span><select name="interval"><option value="maandelijks">Maandelijks</option><option value="jaarlijks">Jaarlijks</option></select></label>
+   <label class="f c2"><span>Eerste betaaldatum</span><input type="date" name="startdatum"></label><label class="f c2"><span>Laatst aangemaakt t/m</span><input type="date" name="laatste_datum"></label>
+   <label class="f c2"><span>Van wie?</span><select name="toewijzing"><option value="ik">Alleen ik</option><option value="gedeeld">Gedeeld</option><option value="jelmer">Jelmer</option></select></label>
+   <label class="f c2"><span>Mijn aandeel (%)</span><input type="number" name="pct_ik"></label><label class="f c2"><span>Rekening</span><select name="rekening">${opts(REK,a.rekening)}</select></label>
+   <label class="f c2"><span>Categorie</span><input name="categorie"></label>
+   <label class="f c2"><span><input type="checkbox" name="actief"> Actief</span></label><label class="f c2"><span><input type="checkbox" name="variabel"> Bedrag wisselt (controleren)</span></label>
+   <label class="f c6"><span>Notitie</span><textarea name="notitie" rows="2"></textarea></label></form>
+   <div class="acts">${id?'<button class="b red l" id="del">Verwijderen</button>':''}<button class="b sec" id="cn">Annuleren</button><button class="b" id="ok">Opslaan</button></div>`);
+  const f=$('#af',m);setv(f,a);$('#cn',m).onclick=m.close;
+  $('#ok',m).onclick=async()=>{if(!f.reportValidity())return;const d={};['naam','omschrijving','bedrag_excl','btw_bedrag','btw_soort','interval','startdatum','laatste_datum','toewijzing','pct_ik','rekening','categorie','actief','variabel','notitie'].forEach(k=>d[k]=val(f,k));
+    d.actief=d.actief?1:0;d.variabel=d.variabel?1:0;if(d.toewijzing==='ik')d.pct_ik=100;if(d.toewijzing==='jelmer')d.pct_ik=0;d.laatste_datum=d.laatste_datum||null;
+    if(id)await api('PUT','abonnementen/'+id,d);else await api('POST','abonnementen',d);m.close();abonnementen()};
+  if(id)$('#del',m).onclick=async()=>{if(!confirm('Abonnement verwijderen? Bestaande boekingen blijven staan.'))return;await api('DELETE','abonnementen/'+id);m.close();abonnementen()};
+}
+
+/* ------------------------------------------------ relaties */
+async function relaties(){
+  const l=state.relaties;cache.rel=l;
+  $('#main').innerHTML=`<div class="bar"><h1>Klanten &amp; leveranciers</h1><span class="sp"></span><button class="b" onclick="editRel()">+ Toevoegen</button></div>
+  <table><thead><tr><th>Naam</th><th>Soort</th><th>Adres</th><th>KvK</th><th>Btw-nr</th><th>E-mail</th></tr></thead><tbody>${l.map(r=>`<tr class="klik" onclick="editRel(${r.id})"><td><b>${esc(r.naam)}</b></td><td>${r.soort}</td><td class="sm">${esc(r.adres)}<br>${esc(r.postcode_plaats)}</td><td>${esc(r.kvk)}</td><td>${esc(r.btw_nr)}</td><td class="sm">${esc(r.email)}</td></tr>`).join('')}</tbody></table>`;
+}
+function editRel(id){
+  const r=id?cache.rel.find(x=>x.id===id):{soort:'klant'};
+  const m=modal(`<h3>${id?'Bewerken':'Nieuwe relatie'}</h3><form id="rf" class="fg">
+   <label class="f c4"><span>Naam</span><input name="naam" required></label><label class="f c2"><span>Soort</span><select name="soort"><option value="klant">Klant</option><option value="leverancier">Leverancier</option></select></label>
+   <label class="f c3"><span>Straat + nr</span><input name="adres"></label><label class="f c3"><span>Postcode, plaats</span><input name="postcode_plaats"></label>
+   <label class="f c2"><span>KvK</span><input name="kvk"></label><label class="f c2"><span>Btw-nr</span><input name="btw_nr"></label><label class="f c2"><span>E-mail</span><input name="email"></label></form>
+   <div class="acts">${id?'<button class="b red l" id="del">Verwijderen</button>':''}<button class="b sec" id="cn">Annuleren</button><button class="b" id="ok">Opslaan</button></div>`);
+  const f=$('#rf',m);setv(f,r);$('#cn',m).onclick=m.close;
+  $('#ok',m).onclick=async()=>{if(!f.reportValidity())return;const d={};['naam','soort','adres','postcode_plaats','kvk','btw_nr','email'].forEach(k=>d[k]=val(f,k));
+    if(id)await api('PUT','relaties/'+id,d);else await api('POST','relaties',d);m.close();go('relaties')};
+  if(id)$('#del',m).onclick=async()=>{if(!confirm('Verwijderen? Bestaande facturen houden hun gegevens.'))return;await api('DELETE','relaties/'+id);m.close();go('relaties')};
+}
+
+/* ------------------------------------------------ instellingen */
+async function instellingen(){
+  const s=state.instellingen;
+  const fld=(k,l,c='c3')=>`<label class="f ${c}"><span>${l}</span><input name="${k}"></label>`;
+  $('#main').innerHTML=`<div class="bar"><h1>Instellingen</h1></div><div class="card"><form id="sf" class="fg">
+   ${fld('bedrijfsnaam','Bedrijfsnaam (eenmanszaak)')}${fld('naam','Jouw naam')}${fld('adres','Adres')}${fld('postcode_plaats','Postcode, plaats')}${fld('iban','IBAN')}${fld('btw_nr','Btw-nummer')}${fld('kvk','KvK-nummer')}${fld('email','E-mail')}${fld('telefoon','Telefoon')}${fld('handelsnaam','Handelsnaam samenwerking')}
+   ${fld('partner_naam','Bedrijf van je compagnon')}${fld('partner_contact','Naam compagnon')}
+   <label class="f c6"><span>Voetregel op facturen van de samenwerking (elke regel een regel)</span><textarea name="voetregel_fluid" rows="2"></textarea></label>
+   ${fld('betaaltermijn','Standaard betaaltermijn (dagen)','c2')}
+   <label class="f c2"><span>Btw rekenen op</span><select name="btw_stelsel"><option value="factuurdatum">Factuurdatum (standaard, factuurstelsel)</option><option value="betaaldatum">Betaaldatum (kasstelsel, alleen als je dat bij de Belastingdienst hebt aangevraagd)</option></select></label>
+   ${fld('verlegd_tarief','Tarief bij verlegde btw (%)','c2')}${fld('wise_startsaldo','Startsaldo Wise-kaart (€)','c2')}</form>
+   <div class="acts"><button class="b" id="ok">Opslaan</button></div></div>
+   <p class="k">Je gegevens staan in <code>data/administratie.db</code> naast dit programma. Bij elke start maakt de app automatisch een back-up in <code>data/backup</code>.</p>`;
+  const f=$('#sf');setv(f,s);
+  $('#ok').onclick=async()=>{const d={};$$('[name]',f).forEach(x=>d[x.name]=x.value);state.instellingen=await api('PUT','instellingen',d);toast('Opgeslagen')};
+}
+nav();go('dashboard');
+</script>
+</body>
+</html>
