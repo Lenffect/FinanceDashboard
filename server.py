@@ -767,7 +767,7 @@ def export_doel():
 
 def maak_export():
     import export
-    res = export.exporteer(BASE, DB, export_doel(), samenvatting_md())
+    res = export.exporteer(BASE, DB, export_doel(), samenvatting_md(), dashboard(dt.date.today().year))
     return res
 
 

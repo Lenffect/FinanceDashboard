@@ -34,4 +34,4 @@ Je hebt alleen Python 3 nodig (op een Mac krijg je dat bij de eerste keer starte
 
 ## Export (platte kopie)
 Bij elke start en bij het afsluiten (venster sluiten of Ctrl+C) schrijft de app een kopie weg in de map `export` (of de map die je bij Instellingen kiest):
-`SAMENVATTING.md`, `data/*.csv`, `administratie.json`, `administratie_kopie.db` en `bestanden/` met alle gekoppelde facturen en btw-stukken. Kies bij Instellingen een map in iCloud/Drive voor een automatische off-site kopie. Handmatig: Instellingen → "Nu exporteren".
+`SAMENVATTING.md`, `administratie.xlsx` (alles in één Excel-bestand), `data/*.csv`, `administratie.json`, `administratie_kopie.db` en `bestanden/` met alle gekoppelde facturen en btw-stukken. Kies bij Instellingen een map in iCloud/Drive voor een automatische off-site kopie. Handmatig: Instellingen → "Nu exporteren".
