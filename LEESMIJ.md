@@ -31,3 +31,7 @@ Je hebt alleen Python 3 nodig (op een Mac krijg je dat bij de eerste keer starte
 2. Bovenaan zie je per rekening of het saldo klopt. Zo niet, dan staat eronder wat ontbreekt.
 3. Regels die niet in de administratie staan: **Maak concept** en keur het goed in de Inbox.
 4. Wise-regels zonder zakelijke boeking tellen als privé; het verschil per maand boek je met één klik.
+
+## Export (platte kopie)
+Bij elke start en bij het afsluiten (venster sluiten of Ctrl+C) schrijft de app een kopie weg in de map `export` (of de map die je bij Instellingen kiest):
+`SAMENVATTING.md`, `data/*.csv`, `administratie.json`, `administratie_kopie.db` en `bestanden/` met alle gekoppelde facturen en btw-stukken. Kies bij Instellingen een map in iCloud/Drive voor een automatische off-site kopie. Handmatig: Instellingen → "Nu exporteren".

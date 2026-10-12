@@ -495,11 +495,15 @@ async function instellingen(){
    <label class="f c6"><span>Voetregel op facturen van de samenwerking (elke regel een regel)</span><textarea name="voetregel_fluid" rows="2"></textarea></label>
    ${fld('betaaltermijn','Standaard betaaltermijn (dagen)','c2')}
    <label class="f c2"><span>Btw rekenen op</span><select name="btw_stelsel"><option value="factuurdatum">Factuurdatum (standaard, factuurstelsel)</option><option value="betaaldatum">Betaaldatum (kasstelsel, alleen als je dat bij de Belastingdienst hebt aangevraagd)</option></select></label>
-   ${fld('verlegd_tarief','Tarief bij verlegde btw (%)','c2')}${fld('wise_startsaldo','Startsaldo Wise-kaart (€)','c2')}</form>
-   <div class="acts"><button class="b" id="ok">Opslaan</button></div></div>
+   ${fld('verlegd_tarief','Tarief bij verlegde btw (%)','c2')}${fld('wise_startsaldo','Startsaldo Wise-kaart (€)','c2')}
+   <label class="f c6"><span>Map voor de export (leeg = map <code>export</code> naast het programma; kies bijvoorbeeld een map in iCloud of Google Drive)</span><input name="export_map" placeholder="/Users/jij/Documents/Administratie-export"></label></form>
+   <div class="acts"><button class="b" id="ok">Opslaan</button> <button class="b sec" id="ex">Nu exporteren</button></div></div>
+   <p class="k">Elke keer dat de app start of afsluit wordt de export bijgewerkt: csv per tabel, één json-bestand, een kopie van de database, een samenvatting en de gekoppelde facturen.</p>
+   <p class="k">Bij elke start en bij het afsluiten van de app wordt de export bijgewerkt: csv per tabel, één json-bestand, een kopie van de database, een samenvatting en de gekoppelde facturen.</p>
    <p class="k">Je gegevens staan in <code>data/administratie.db</code> naast dit programma. Bij elke start maakt de app automatisch een back-up in <code>data/backup</code>.</p>`;
   const f=$('#sf');setv(f,s);
   $('#ok').onclick=async()=>{const d={};$$('[name]',f).forEach(x=>d[x.name]=x.value);state.instellingen=await api('PUT','instellingen',d);toast('Opgeslagen')};
+  $('#ex').onclick=async()=>{const d={};$$('[name]',f).forEach(x=>d[x.name]=x.value);await api('PUT','instellingen',d);const r=await api('POST','export',{});toast('Export bijgewerkt: '+r.map)};
 }
 nav();go('dashboard');
 </script>

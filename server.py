@@ -55,7 +55,7 @@ DEFAULTS = {
     'partner_naam': 'JPPW Consultancy', 'partner_contact': '',
     'voetregel_fluid': 'Fluid Marketing is een samenwerking tussen Lenffect & JPP Consultancy\nFluid Marketing is een handelsnaam van Lenffect',
     'betaaltermijn': '14', 'btw_stelsel': 'factuurdatum', 'verlegd_tarief': '21', 'wise_startsaldo': '-3.12',
-    'ing_saldo_werkelijk': '', 'ing_saldo_datum': '', 'btw_betaald_t_m': '2026-Q2',
+    'ing_saldo_werkelijk': '', 'ing_saldo_datum': '', 'btw_betaald_t_m': '2026-Q2', 'export_map': '',
 }
 
 BOEK_FIELDS = ['soort', 'datum', 'omschrijving', 'relatie', 'factuurnr', 'bedrag_excl', 'btw_bedrag', 'btw_soort',
@@ -735,6 +735,42 @@ def bank_prive(d):
     return b
 
 
+def samenvatting_md():
+    d = dashboard(dt.date.today().year)
+    e = lambda n: ('€ {:,.2f}'.format(n or 0)).replace(',', 'X').replace('.', ',').replace('X', '.')
+    l = ['# Samenvatting administratie Lenffect', '', 'Bijgewerkt: %s' % dt.datetime.now().strftime('%d-%m-%Y %H:%M'), '',
+         '## Saldi', '',
+         '- ING zakelijk (berekend): %s' % e(d['ing_saldo']),
+         '- ING zakelijk (laatst gecontroleerd met bank): %s (%s)' % (e(d['ing_werkelijk']) if d['ing_werkelijk'] is not None else '-', d['ing_datum'] or '-'),
+         '- Wise-kaart (berekend): %s' % e(d['wise_saldo']),
+         '- Btw-reserve (nog te betalen kwartalen): %s' % e(d['btw_reserve']),
+         '- Schuld aan Jelmer (verrekening): %s' % e(d['schuld_jelmer']),
+         '- Vrij te besteden: %s' % (e(d['vrij']) if d['vrij'] is not None else '-'), '',
+         '## Per kwartaal %d' % d['jaar'], '', '| Kwartaal | Omzet (excl.) | Kosten (mijn deel) | Winst | Btw (+ af te dragen / − terug) | Aangifte vóór |', '|---|---:|---:|---:|---:|---|']
+    for k in d['kwartalen']:
+        l.append('| Q%d | %s | %s | %s | %s | %s |' % (k['kwartaal'], e(k['omzet']), e(k['kosten']), e(k['winst']), e(k['btw_saldo']), k['deadline']))
+    l += ['', '## Openstaande facturen (aan klanten)', '']
+    l += ['- %s · %s · %s · %d dagen open' % (b['factuurnr'], b['relatie'], e(b['bedrag_excl'] + b['btw_bedrag']), b['dagen_open']) for b in d['open_facturen']] or ['- geen']
+    l += ['', '## Nog te controleren', '', '- concepten: %d' % d['concepten']]
+    l += ['- %s %s' % (b['datum'], b['omschrijving']) for b in d['te_controleren']]
+    return '\n'.join(l) + '\n'
+
+
+def export_doel():
+    gekozen = (settings().get('export_map') or '').strip()
+    doel = os.path.abspath(os.path.expanduser(gekozen)) if gekozen else os.path.join(BASE, 'export')
+    verboden = [BASE, DATA, INBOX, ARCHIEF, os.path.join(BASE, 'btw')]
+    if any(os.path.normpath(doel) == os.path.normpath(v) for v in verboden):
+        raise ValueError('Kies voor de export een aparte map (niet de programmamap, data, facturen of inbox).')
+    return doel
+
+
+def maak_export():
+    import export
+    res = export.exporteer(BASE, DB, export_doel(), samenvatting_md())
+    return res
+
+
 class H(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
@@ -818,6 +854,8 @@ class H(BaseHTTPRequestHandler):
         # --- boekingen
         if p == 'boekingen' and method == 'GET':
             return list_boekingen(params)
+        if p == 'export' and method == 'POST':
+            return maak_export()
         if p == 'bank/analyse' and method == 'POST':
             return bank_analyse(body)
         if p == 'bank/concept' and method == 'POST':
@@ -932,17 +970,37 @@ class H(BaseHTTPRequestHandler):
     def do_DELETE(self): self.handle_any('DELETE')
 
 
+def veilig_exporteren(wanneer):
+    try:
+        r = maak_export()
+        print('Export (%s) bijgewerkt: %s' % (wanneer, r['map']))
+    except Exception as ex:  # noqa — een mislukte export mag het afsluiten nooit blokkeren
+        print('Let op: export (%s) is mislukt: %s' % (wanneer, ex))
+
+
 def main():
+    import signal
     init_db()
+    veilig_exporteren('start')
     srv = ThreadingHTTPServer(('127.0.0.1', PORT), H)
     url = 'http://127.0.0.1:%d' % PORT
-    print('Lenffect administratie draait op', url, '(sluit dit venster om te stoppen)')
+    print('Lenffect administratie draait op', url, '(sluit dit venster of druk Ctrl+C om te stoppen; daarbij wordt de export bijgewerkt)')
     if not os.environ.get('NO_BROWSER'):
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
+
+    def stop(*_a):
+        raise KeyboardInterrupt
+    for sig in ('SIGTERM', 'SIGHUP'):
+        if hasattr(signal, sig):
+            signal.signal(getattr(signal, sig), stop)
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
         pass
+    finally:
+        print('Afsluiten… export bijwerken')
+        veilig_exporteren('afsluiten')
+        srv.server_close()
 
 
 if __name__ == '__main__':
