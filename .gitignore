@@ -9,3 +9,6 @@ __pycache__/
 .DS_Store
 
 export/
+
+# Btw-aangiftes en correspondentie met de Belastingdienst
+btw/
