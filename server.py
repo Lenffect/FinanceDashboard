@@ -45,6 +45,14 @@ CREATE TABLE IF NOT EXISTS facturen(
   klant TEXT DEFAULT '{}', onder TEXT DEFAULT 'fluid', regels TEXT DEFAULT '[]',
   btw_pct REAL DEFAULT 21, termijn INTEGER DEFAULT 14, betaallink TEXT DEFAULT '', notitie TEXT DEFAULT '',
   excl REAL DEFAULT 0, btw REAL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS opdrachten(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, naam TEXT NOT NULL, klant TEXT DEFAULT '',
+  type TEXT DEFAULT 'uur', uurtarief REAL DEFAULT 0, vast_bedrag REAL DEFAULT 0,
+  actief INTEGER DEFAULT 1, notitie TEXT DEFAULT '');
+CREATE TABLE IF NOT EXISTS uren(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, opdracht_id INTEGER NOT NULL, datum TEXT NOT NULL,
+  uren REAL DEFAULT 0, omschrijving TEXT DEFAULT '');
+CREATE INDEX IF NOT EXISTS ix_uren_datum ON uren(datum);
 """
 
 DEFAULTS = {
@@ -64,6 +72,8 @@ BOEK_FIELDS = ['soort', 'datum', 'omschrijving', 'relatie', 'factuurnr', 'bedrag
 ABO_FIELDS = ['naam', 'omschrijving', 'bedrag_excl', 'btw_bedrag', 'btw_soort', 'toewijzing', 'pct_ik', 'rekening',
               'categorie', 'interval', 'startdatum', 'laatste_datum', 'actief', 'variabel', 'notitie']
 REL_FIELDS = ['naam', 'soort', 'adres', 'postcode_plaats', 'kvk', 'btw_nr', 'email', 'std_btw_soort', 'notitie']
+OPD_FIELDS = ['naam', 'klant', 'type', 'uurtarief', 'vast_bedrag', 'actief', 'notitie']
+UREN_FIELDS = ['opdracht_id', 'datum', 'uren', 'omschrijving']
 PRIVE_SOORTEN = ('prive_uitgave', 'storting', 'btw_betaling', 'overboeking', 'overige_baten', 'btw_teruggave')
 JPPW = 'JPPW-factuur'
 AFTREKBAAR_IN_BRUTO = ('nl21', 'nl9', 'buitenlandse_btw')
@@ -166,6 +176,19 @@ def insert(c, table, fields, d):
 def update(c, table, fields, d, id_):
     c.execute('UPDATE %s SET %s WHERE id=?' % (table, ','.join(k + '=?' for k in fields)),
               [d.get(k) for k in fields] + [id_])
+
+
+def clean_uren(d):
+    datum = d.get('datum') or dt.date.today().isoformat()
+    if not re.match(r'^\d{4}-\d{2}-\d{2}$', datum):
+        raise ValueError('Ongeldige datum')
+    if not q('SELECT 1 FROM opdrachten WHERE id=?', (d.get('opdracht_id'),)):
+        raise ValueError('Kies een opdracht')
+    uren = float(d.get('uren') or 0)
+    if not 0 < uren <= 24:
+        raise ValueError('Uren moet tussen 0 en 24 liggen')
+    return {'opdracht_id': int(d['opdracht_id']), 'datum': datum, 'uren': round(uren, 2),
+            'omschrijving': (d.get('omschrijving') or '').strip()}
 
 
 def list_boekingen(p):
@@ -912,7 +935,38 @@ class H(BaseHTTPRequestHandler):
         if p == 'abonnementen/genereer' and method == 'POST':
             return genereer_abonnementen()
         # --- relaties / abonnementen (eenvoudige CRUD)
-        for name, table, fields in (('relaties', 'relaties', REL_FIELDS), ('abonnementen', 'abonnementen', ABO_FIELDS)):
+        # --- opdrachten en uren
+        if p == 'uren' and method == 'GET':
+            sql, args = 'SELECT * FROM uren WHERE 1=1', []
+            if params.get('van'):
+                sql += ' AND datum>=?'; args.append(params['van'])
+            if params.get('tot'):
+                sql += ' AND datum<=?'; args.append(params['tot'])
+            return q(sql + ' ORDER BY datum DESC, id DESC', args)
+        if p == 'uren' and method == 'POST':
+            u = clean_uren(body)
+            with closing(db()) as c:
+                u['id'] = insert(c, 'uren', UREN_FIELDS, u)
+                c.commit()
+            return u
+        m = re.match(r'^uren/(\d+)$', p)
+        if m and method == 'PUT':
+            old = q('SELECT * FROM uren WHERE id=?', (int(m.group(1)),), one=True) or {}
+            u = clean_uren({**old, **body})
+            with closing(db()) as c:
+                update(c, 'uren', UREN_FIELDS, u, int(m.group(1)))
+                c.commit()
+            return u
+        if m and method == 'DELETE':
+            with closing(db()) as c:
+                c.execute('DELETE FROM uren WHERE id=?', (int(m.group(1)),))
+                c.commit()
+            return {'ok': True}
+        m = re.match(r'^opdrachten/(\d+)$', p)
+        if m and method == 'DELETE' and q('SELECT 1 FROM uren WHERE opdracht_id=?', (int(m.group(1)),)):
+            raise ValueError('Deze opdracht heeft uren. Zet hem op niet-actief in plaats van verwijderen.')
+        for name, table, fields in (('relaties', 'relaties', REL_FIELDS), ('abonnementen', 'abonnementen', ABO_FIELDS),
+                                    ('opdrachten', 'opdrachten', OPD_FIELDS)):
             if p == name and method == 'GET':
                 return q('SELECT * FROM %s ORDER BY naam COLLATE NOCASE' % table)
             if p == name and method == 'POST':
