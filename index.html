@@ -505,6 +505,27 @@ async function instellingen(){
   $('#ok').onclick=async()=>{const d={};$$('[name]',f).forEach(x=>d[x.name]=x.value);state.instellingen=await api('PUT','instellingen',d);toast('Opgeslagen')};
   $('#ex').onclick=async()=>{const d={};$$('[name]',f).forEach(x=>d[x.name]=x.value);await api('PUT','instellingen',d);const r=await api('POST','export',{});toast('Export bijgewerkt: '+r.map)};
 }
+// Rekenen in getalvelden: typ bijv. 7,64+5,12+94,21 en druk op Enter of ga naar een ander veld.
+const REKEN=/[+\-*\/()]/;
+function rekenUit(t){
+  let s=t.replace(/\s/g,'').replace('€','');
+  if(s.includes(','))s=s.replace(/\./g,'').replace(/,/g,'.');
+  if(!s||!/^[0-9.+\-*\/()]+$/.test(s)||!/[0-9]/.test(s))return null;
+  try{const r=Function('"use strict";return ('+s+')')();return Number.isFinite(r)?Math.round(r*1e6)/1e6:null}catch(e){return null}
+}
+function rekenVeld(el){
+  const t=el.value;if(!/[+*\/()]|.-/.test(t.trim()))return false;
+  const r=rekenUit(t);if(r===null)return false;
+  el.value=String(r);el.dispatchEvent(new Event('input',{bubbles:true}));el.dispatchEvent(new Event('change',{bubbles:true}));return true;
+}
+function maakRekenbaar(root){
+  (root.querySelectorAll?root.querySelectorAll('input[type=number]'):[]).forEach(i=>{i.type='text';i.inputMode='decimal';i.autocomplete='off'});
+}
+document.addEventListener('input',e=>{const t=e.target;if(t.inputMode==='decimal'&&REKEN.test(t.value.replace(/^\s*-/,'')))e.stopImmediatePropagation()},true);
+document.addEventListener('keydown',e=>{if(e.key==='Enter'&&e.target.inputMode==='decimal'&&rekenVeld(e.target))e.preventDefault()},true);
+document.addEventListener('focusout',e=>{if(e.target.inputMode==='decimal')rekenVeld(e.target)},true);
+new MutationObserver(ms=>ms.forEach(m=>m.addedNodes.forEach(n=>{if(n.nodeType===1){if(n.matches('input[type=number]'))maakRekenbaar({querySelectorAll:()=>[n]});maakRekenbaar(n)}}))).observe(document.body,{childList:true,subtree:true});
+maakRekenbaar(document);
 nav();go('dashboard');
 </script>
 </body>
