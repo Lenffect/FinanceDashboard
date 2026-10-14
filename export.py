@@ -8,6 +8,7 @@ import csv, json, os, re, shutil, sqlite3, zipfile, datetime as dt
 from xml.sax.saxutils import escape
 from contextlib import closing
 
+PRIVE_INSTELLINGEN = ('prive_',)
 TABELLEN_VOLGORDE = ['boekingen', 'relaties', 'abonnementen', 'facturen', 'instellingen']
 
 
@@ -148,7 +149,12 @@ def exporteer(base, db_pad, doelmap, samenvatting_tekst=None, dash=None):
         tabellen = [r[0] for r in c.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%'")]
         tabellen.sort(key=lambda t: (TABELLEN_VOLGORDE.index(t) if t in TABELLEN_VOLGORDE else 99, t))
         for t in tabellen:
+            if t.startswith('prive_'):
+                continue  # privé-gegevens blijven lokaal: nooit in de export (die kan in iCloud staan)
             kol, rijen = _rijen(c, t)
+            if t == 'instellingen':
+                i = kol.index('sleutel')
+                rijen = [r for r in rijen if not str(r[i]).startswith(PRIVE_INSTELLINGEN)]
             if t == 'boekingen' and 'bijlage' in kol:
                 i = kol.index('bijlage')
                 kol = kol + ['bijlage_in_export']
@@ -163,6 +169,11 @@ def exporteer(base, db_pad, doelmap, samenvatting_tekst=None, dash=None):
             os.remove(tmp)
         with closing(sqlite3.connect(tmp)) as d:
             c.backup(d)
+            for t in [r[0] for r in d.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'prive\\_%' ESCAPE '\\'")]:
+                d.execute('DROP TABLE "%s"' % t)
+            d.execute("DELETE FROM instellingen WHERE sleutel LIKE 'prive\\_%' ESCAPE '\\' OR sleutel='modus'")
+            d.commit()
+            d.execute('VACUUM')
         os.replace(tmp, kopie)
     meta = {'geexporteerd_op': nu.isoformat(timespec='seconds'), 'tabellen': {t: len(r) for t, r in alles.items()}}
     _schrijf_atomair(os.path.join(doelmap, 'administratie.json'), json.dumps({'meta': meta, **alles}, ensure_ascii=False, indent=1, default=str))

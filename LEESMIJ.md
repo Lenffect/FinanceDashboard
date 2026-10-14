@@ -1,4 +1,4 @@
-# Lenffect administratie
+# Lennar Finance
 
 Lokale boekhoud-app voor je eenmanszaak en de samenwerking met Jelmer. Alles blijft op je eigen computer.
 

@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Lenffect administratie - lokale app (geen installatie nodig, alleen Python 3).
+"""Lennar Finance - lokale app (geen installatie nodig, alleen Python 3).
 Start met Start.command (dubbelklik) of:  python3 server.py
 """
 import sqlite3, json, os, re, shutil, sys, threading, webbrowser, html, calendar, datetime as dt
@@ -57,6 +57,8 @@ CREATE TABLE IF NOT EXISTS prive_mutaties(
   id INTEGER PRIMARY KEY AUTOINCREMENT, datum TEXT NOT NULL, soort TEXT DEFAULT 'uitgave',
   bedrag REAL DEFAULT 0, categorie TEXT DEFAULT '', omschrijving TEXT DEFAULT '');
 CREATE INDEX IF NOT EXISTS ix_prive_datum ON prive_mutaties(datum);
+CREATE TABLE IF NOT EXISTS prive_regels(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, zoek TEXT NOT NULL, categorie TEXT NOT NULL);
 CREATE TABLE IF NOT EXISTS prive_vast(
   id INTEGER PRIMARY KEY AUTOINCREMENT, naam TEXT NOT NULL, soort TEXT DEFAULT 'uitgave',
   bedrag REAL DEFAULT 0, interval TEXT DEFAULT 'maandelijks', categorie TEXT DEFAULT '',
@@ -82,7 +84,7 @@ ABO_FIELDS = ['naam', 'omschrijving', 'bedrag_excl', 'btw_bedrag', 'btw_soort', 
 REL_FIELDS = ['naam', 'soort', 'adres', 'postcode_plaats', 'kvk', 'btw_nr', 'email', 'std_btw_soort', 'notitie']
 OPD_FIELDS = ['naam', 'klant', 'type', 'uurtarief', 'vast_bedrag', 'actief', 'notitie']
 UREN_FIELDS = ['opdracht_id', 'datum', 'uren', 'omschrijving']
-PMUT_FIELDS = ['datum', 'soort', 'bedrag', 'categorie', 'omschrijving']
+PMUT_FIELDS = ['datum', 'soort', 'bedrag', 'categorie', 'omschrijving', 'rekening', 'ext_id', 'intern', 'tegenpartij', 'saldo_na']
 PVAST_FIELDS = ['naam', 'soort', 'bedrag', 'interval', 'categorie', 'actief', 'notitie']
 PRIVE_SOORTEN = ('prive_uitgave', 'storting', 'btw_betaling', 'overboeking', 'overige_baten', 'btw_teruggave')
 JPPW = 'JPPW-factuur'
@@ -125,6 +127,12 @@ def init_db():
             c.execute("ALTER TABLE boekingen ADD COLUMN status TEXT DEFAULT 'definitief'")
         if 'bijlage' not in kolommen:
             c.execute("ALTER TABLE boekingen ADD COLUMN bijlage TEXT DEFAULT ''")
+        pk = [r[1] for r in c.execute('PRAGMA table_info(prive_mutaties)')]
+        for naam, typ in (('rekening', "TEXT DEFAULT ''"), ('ext_id', "TEXT DEFAULT ''"), ('intern', 'INTEGER DEFAULT 0'),
+                          ('tegenpartij', "TEXT DEFAULT ''"), ('saldo_na', 'REAL')):
+            if naam not in pk:
+                c.execute('ALTER TABLE prive_mutaties ADD COLUMN %s %s' % (naam, typ))
+        c.execute('CREATE INDEX IF NOT EXISTS ix_prive_ext ON prive_mutaties(ext_id)')
         for k, v in DEFAULTS.items():
             c.execute('INSERT OR IGNORE INTO instellingen(sleutel,waarde) VALUES(?,?)', (k, v))
         c.commit()
@@ -209,7 +217,36 @@ def clean_pmut(d):
     if not bedrag:
         raise ValueError('Vul een bedrag in')
     return {'datum': datum, 'soort': 'inkomen' if d.get('soort') == 'inkomen' else 'uitgave', 'bedrag': r2(bedrag),
-            'categorie': (d.get('categorie') or '').strip(), 'omschrijving': (d.get('omschrijving') or '').strip()}
+            'categorie': (d.get('categorie') or '').strip(), 'omschrijving': (d.get('omschrijving') or '').strip(),
+            'rekening': d.get('rekening') or '', 'ext_id': d.get('ext_id') or '', 'intern': 1 if d.get('intern') else 0,
+            'tegenpartij': d.get('tegenpartij') or '', 'saldo_na': d.get('saldo_na')}
+
+
+def prive_import(tekst):
+    import prive_bank
+    regels = [(r['zoek'], r['categorie']) for r in q('SELECT zoek,categorie FROM prive_regels ORDER BY id DESC')]
+    eigen = {r['rekening'] for r in q("SELECT DISTINCT rekening FROM prive_mutaties")}
+    nieuw, soort = prive_bank.lees(tekst, (), regels)
+    bestaand = {r['ext_id'] for r in q("SELECT ext_id FROM prive_mutaties WHERE ext_id<>''")}
+    n = dubbel = 0
+    with closing(db()) as c:
+        for m in nieuw:
+            if m['ext_id'] in bestaand:
+                dubbel += 1
+                continue
+            insert(c, 'prive_mutaties', PMUT_FIELDS, m)
+            n += 1
+        c.commit()
+    return {'soort': soort, 'nieuw': n, 'al_aanwezig': dubbel}
+
+
+def prive_saldos():
+    out = []
+    for r in q("SELECT rekening, MAX(datum) AS datum FROM prive_mutaties WHERE rekening<>'' AND saldo_na IS NOT NULL GROUP BY rekening ORDER BY rekening"):
+        last = q('SELECT saldo_na FROM prive_mutaties WHERE rekening=? AND saldo_na IS NOT NULL ORDER BY datum DESC, id DESC LIMIT 1',
+                 (r['rekening'],), one=True)
+        out.append({'rekening': r['rekening'], 'datum': r['datum'], 'saldo': last['saldo_na']})
+    return out
 
 
 def list_boekingen(p):
@@ -997,6 +1034,23 @@ class H(BaseHTTPRequestHandler):
                 u['id'] = insert(c, 'prive_mutaties', PMUT_FIELDS, u)
                 c.commit()
             return u
+        if p == 'prive/import' and method == 'POST':
+            return prive_import(body.get('tekst') or '')
+        if p == 'prive/saldos' and method == 'GET':
+            return prive_saldos()
+        if p == 'prive/ongecategoriseerd' and method == 'GET':
+            return q("""SELECT tegenpartij, soort, COUNT(*) AS aantal, ROUND(SUM(bedrag),2) AS totaal FROM prive_mutaties
+                       WHERE categorie='' AND intern=0 AND tegenpartij<>'' GROUP BY tegenpartij, soort ORDER BY SUM(bedrag) DESC LIMIT 60""")
+        if p == 'prive/categoriseer' and method == 'POST':
+            zoek, cat = (body.get('zoek') or '').strip(), (body.get('categorie') or '').strip()
+            if not zoek or not cat:
+                raise ValueError('Vul een naam en categorie in')
+            with closing(db()) as c:
+                c.execute('INSERT INTO prive_regels(zoek,categorie) VALUES(?,?)', (zoek, cat))
+                n = c.execute("UPDATE prive_mutaties SET categorie=? WHERE categorie='' AND intern=0 AND (tegenpartij LIKE ? OR omschrijving LIKE ?)",
+                              (cat, '%' + zoek + '%', '%' + zoek + '%')).rowcount
+                c.commit()
+            return {'bijgewerkt': n}
         m = re.match(r'^prive/mutaties/(\d+)$', p)
         if m and method == 'PUT':
             old = q('SELECT * FROM prive_mutaties WHERE id=?', (int(m.group(1)),), one=True) or {}
@@ -1087,7 +1141,7 @@ def main():
     veilig_exporteren('start')
     srv = ThreadingHTTPServer(('127.0.0.1', PORT), H)
     url = 'http://127.0.0.1:%d' % PORT
-    print('Lenffect administratie draait op', url, '(sluit dit venster of druk Ctrl+C om te stoppen; daarbij wordt de export bijgewerkt)')
+    print('Lennar Finance draait op', url, '(sluit dit venster of druk Ctrl+C om te stoppen; daarbij wordt de export bijgewerkt)')
     if not os.environ.get('NO_BROWSER'):
         threading.Timer(0.8, lambda: webbrowser.open(url)).start()
 

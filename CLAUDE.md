@@ -1,4 +1,4 @@
-# Administratie Lenffect / Fluid Marketing
+# Lennar Finance (administratie Lenffect / Fluid Marketing)
 
 Persoonlijke administratie-app van Lennar Schumacher (eenmanszaak **Lenffect**, handelsnaam **Fluid Marketing**,
 samenwerking met Jelmer de Weijer / JPPW Consultancy). Taal van de app én van alle communicatie: **Nederlands**.
@@ -35,3 +35,7 @@ Afschrijving iPhone en MacBook; ING-promotie €150 (winst?); Nederlandse btw op
 - Wijzig geen data in de echte database zonder dat Lennar het vraagt; maak bij twijfel een concept of vraag het.
 - Maak vóór schema- of data-aanpassingen een kopie in `data/backup/`.
 - Commit klein en beschrijvend (Nederlands of Engels, consistent). Geen database, facturen of bankbestanden committen.
+
+## Privé (Lennar Finance)
+- Privé-gegevens (tabellen `prive_*`, bankafschriften uit `inbox/`) blijven **lokaal**: `export.py` slaat ze over (de exportmap staat in iCloud) en haalt ze uit de database-kopie. Houd dat zo bij nieuwe tabellen.
+- `prive_bank.py`: leest ING-csv (lopend + spaar), markeert interne overboekingen (eigen rekeningen, spaar, Wise) zodat ze niet als inkomen/uitgave tellen.
