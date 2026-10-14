@@ -53,6 +53,14 @@ CREATE TABLE IF NOT EXISTS uren(
   id INTEGER PRIMARY KEY AUTOINCREMENT, opdracht_id INTEGER NOT NULL, datum TEXT NOT NULL,
   uren REAL DEFAULT 0, omschrijving TEXT DEFAULT '');
 CREATE INDEX IF NOT EXISTS ix_uren_datum ON uren(datum);
+CREATE TABLE IF NOT EXISTS prive_mutaties(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, datum TEXT NOT NULL, soort TEXT DEFAULT 'uitgave',
+  bedrag REAL DEFAULT 0, categorie TEXT DEFAULT '', omschrijving TEXT DEFAULT '');
+CREATE INDEX IF NOT EXISTS ix_prive_datum ON prive_mutaties(datum);
+CREATE TABLE IF NOT EXISTS prive_vast(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, naam TEXT NOT NULL, soort TEXT DEFAULT 'uitgave',
+  bedrag REAL DEFAULT 0, interval TEXT DEFAULT 'maandelijks', categorie TEXT DEFAULT '',
+  actief INTEGER DEFAULT 1, notitie TEXT DEFAULT '');
 """
 
 DEFAULTS = {
@@ -74,6 +82,8 @@ ABO_FIELDS = ['naam', 'omschrijving', 'bedrag_excl', 'btw_bedrag', 'btw_soort', 
 REL_FIELDS = ['naam', 'soort', 'adres', 'postcode_plaats', 'kvk', 'btw_nr', 'email', 'std_btw_soort', 'notitie']
 OPD_FIELDS = ['naam', 'klant', 'type', 'uurtarief', 'vast_bedrag', 'actief', 'notitie']
 UREN_FIELDS = ['opdracht_id', 'datum', 'uren', 'omschrijving']
+PMUT_FIELDS = ['datum', 'soort', 'bedrag', 'categorie', 'omschrijving']
+PVAST_FIELDS = ['naam', 'soort', 'bedrag', 'interval', 'categorie', 'actief', 'notitie']
 PRIVE_SOORTEN = ('prive_uitgave', 'storting', 'btw_betaling', 'overboeking', 'overige_baten', 'btw_teruggave')
 JPPW = 'JPPW-factuur'
 AFTREKBAAR_IN_BRUTO = ('nl21', 'nl9', 'buitenlandse_btw')
@@ -189,6 +199,17 @@ def clean_uren(d):
         raise ValueError('Uren moet tussen 0 en 24 liggen')
     return {'opdracht_id': int(d['opdracht_id']), 'datum': datum, 'uren': round(uren, 2),
             'omschrijving': (d.get('omschrijving') or '').strip()}
+
+
+def clean_pmut(d):
+    datum = d.get('datum') or dt.date.today().isoformat()
+    if not re.match(r'^\d{4}-\d{2}-\d{2}$', datum):
+        raise ValueError('Ongeldige datum')
+    bedrag = abs(float(d.get('bedrag') or 0))
+    if not bedrag:
+        raise ValueError('Vul een bedrag in')
+    return {'datum': datum, 'soort': 'inkomen' if d.get('soort') == 'inkomen' else 'uitgave', 'bedrag': r2(bedrag),
+            'categorie': (d.get('categorie') or '').strip(), 'omschrijving': (d.get('omschrijving') or '').strip()}
 
 
 def list_boekingen(p):
@@ -962,16 +983,43 @@ class H(BaseHTTPRequestHandler):
                 c.execute('DELETE FROM uren WHERE id=?', (int(m.group(1)),))
                 c.commit()
             return {'ok': True}
+        # --- privé-administratie (los van de zakelijke boekingen)
+        if p == 'prive/mutaties' and method == 'GET':
+            sql, args = 'SELECT * FROM prive_mutaties WHERE 1=1', []
+            if params.get('van'):
+                sql += ' AND datum>=?'; args.append(params['van'])
+            if params.get('tot'):
+                sql += ' AND datum<=?'; args.append(params['tot'])
+            return q(sql + ' ORDER BY datum DESC, id DESC', args)
+        if p == 'prive/mutaties' and method == 'POST':
+            u = clean_pmut(body)
+            with closing(db()) as c:
+                u['id'] = insert(c, 'prive_mutaties', PMUT_FIELDS, u)
+                c.commit()
+            return u
+        m = re.match(r'^prive/mutaties/(\d+)$', p)
+        if m and method == 'PUT':
+            old = q('SELECT * FROM prive_mutaties WHERE id=?', (int(m.group(1)),), one=True) or {}
+            u = clean_pmut({**old, **body})
+            with closing(db()) as c:
+                update(c, 'prive_mutaties', PMUT_FIELDS, u, int(m.group(1)))
+                c.commit()
+            return u
+        if m and method == 'DELETE':
+            with closing(db()) as c:
+                c.execute('DELETE FROM prive_mutaties WHERE id=?', (int(m.group(1)),))
+                c.commit()
+            return {'ok': True}
         m = re.match(r'^opdrachten/(\d+)$', p)
         if m and method == 'DELETE' and q('SELECT 1 FROM uren WHERE opdracht_id=?', (int(m.group(1)),)):
             raise ValueError('Deze opdracht heeft uren. Zet hem op niet-actief in plaats van verwijderen.')
         for name, table, fields in (('relaties', 'relaties', REL_FIELDS), ('abonnementen', 'abonnementen', ABO_FIELDS),
-                                    ('opdrachten', 'opdrachten', OPD_FIELDS)):
+                                    ('opdrachten', 'opdrachten', OPD_FIELDS), ('prive/vast', 'prive_vast', PVAST_FIELDS)):
             if p == name and method == 'GET':
                 return q('SELECT * FROM %s ORDER BY naam COLLATE NOCASE' % table)
             if p == name and method == 'POST':
                 with closing(db()) as c:
-                    body['id'] = insert(c, table, fields, {k: body.get(k) for k in fields})
+                    body['id'] = insert(c, table, [k for k in fields if k in body], body)  # ontbrekende velden: standaardwaarde van de tabel
                     c.commit()
                 return body
             m = re.match(r'^%s/(\d+)$' % name, p)

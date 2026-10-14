@@ -60,7 +60,7 @@ h3{font-size:14px;margin:18px 0 6px}
 .stat .big{font-size:24px}.pbar{display:flex;height:10px;border-radius:99px;overflow:hidden;background:var(--line);margin:8px 0}.pbar i{display:block;height:100%}
 .leg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--mut)}.leg b{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
 .quick{display:grid;grid-template-columns:130px 1.3fr 90px 2fr auto;gap:8px;align-items:end;margin:14px 0 6px}
-.dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:8px}.quick input,.quick select{height:34px}.dag td{background:var(--side);font-size:12px;font-weight:600;color:var(--mut)}
+.seg{display:flex;background:var(--hover);border-radius:8px;padding:2px;margin:0 4px 6px}.seg button{flex:1;justify-content:center!important;text-align:center!important;border-radius:6px!important;font-weight:500}.seg button.on{background:var(--card)!important;box-shadow:0 1px 2px rgba(0,0,0,.12);font-weight:600}.dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:8px}.quick input,.quick select{height:34px}.dag td{background:var(--side);font-size:12px;font-weight:600;color:var(--mut)}
 @media(max-width:1000px){.rv{grid-template-columns:1fr}.pv{position:static}}
 @media(max-width:800px){.shell{flex-direction:column}aside{width:auto;height:auto;position:static;border-right:0;border-bottom:1px solid var(--line)}nav{flex-direction:row;flex-wrap:wrap}nav h6{display:none}main{padding:20px 16px 80px}.quick{grid-template-columns:1fr 1fr}}
 @media(max-width:700px){.fg{grid-template-columns:1fr 1fr}.fg>*{grid-column:span 2!important}.regel{grid-template-columns:1fr 1fr}.hide-m{display:none}}
@@ -115,17 +115,23 @@ function lastQ(){const d=new Date();let q=Math.floor(d.getMonth()/3)+1,y=d.getFu
 const GROEPEN=[['Werk',[['dashboard','Overzicht'],['uren','Uren'],['facturen','Facturen'],['prijs','Prijscalculator']]],
  ['Boekhouding',[['inbox','Inbox'],['bank','Bank afstemmen'],['boekingen','Boekingen'],['btw','Btw-aangifte'],['verrekening','Verrekening Jelmer']]],
  ['Beheer',[['abonnementen','Abonnementen'],['relaties','Klanten & leveranciers'],['instellingen','Instellingen']]]];
-const VAST=['dashboard','instellingen'];
+const GROEPEN_PRIVE=[['Privé',[['priveov','Overzicht'],['privemut','Mutaties'],['privevast','Vaste lasten'],['priveprog','Prognose']]],
+ ['Beheer',[['instellingen','Instellingen']]]];
+const VAST=['dashboard','priveov','instellingen'];
+const modus=()=>state.modus||state.instellingen.modus||'zakelijk';
+const groepen=()=>modus()==='prive'?GROEPEN_PRIVE:GROEPEN;
 function verborgen(){try{return JSON.parse(state.instellingen.nav_verborgen||'[]')}catch(e){return[]}}
+async function zetModus(m){state.modus=m;state.instellingen=await api('PUT','instellingen',{modus:m});go(m==='prive'?'priveov':'dashboard')}
 function nav(){
-  const vb=verborgen();
-  $('#nav').innerHTML=GROEPEN.map(([g,l])=>[g,l.filter(([k])=>!vb.includes(k)||k===state.page)]).filter(([,l])=>l.length).map(([g,l])=>`<h6>${g}</h6>`+l.map(([k,t])=>`<button class="${state.page===k?'on':''}" data-p="${k}">${t}${k==='inbox'&&state.inboxN?` <span class="tag flag">${state.inboxN}</span>`:''}</button>`).join('')).join('');
-  $$('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.p));
+  const vb=verborgen(),mo=modus();
+  $('#nav').innerHTML=`<div class="seg"><button class="${mo==='zakelijk'?'on':''}" onclick="zetModus('zakelijk')">Zakelijk</button><button class="${mo==='prive'?'on':''}" onclick="zetModus('prive')">Privé</button></div>`+
+   groepen().map(([g,l])=>[g,l.filter(([k])=>!vb.includes(k)||k===state.page)]).filter(([,l])=>l.length).map(([g,l])=>`<h6>${g}</h6>`+l.map(([k,t])=>`<button class="${state.page===k?'on':''}" data-p="${k}">${t}${k==='inbox'&&state.inboxN?` <span class="tag flag">${state.inboxN}</span>`:''}</button>`).join('')).join('');
+  $$('#nav button[data-p]').forEach(b=>b.onclick=()=>go(b.dataset.p));
 }
-async function go(p){state.page=p;nav();$('#main').innerHTML='<p class="mut">Laden…</p>';window.scrollTo(0,0);
-  state.relaties=await api('GET','relaties');state.instellingen=await api('GET','instellingen');
+async function go(p){if(p==='dashboard'&&modus()==='prive')p='priveov';if(p==='priveov'&&modus()!=='prive')state.modus='prive';state.page=p;nav();$('#main').innerHTML='<p class="mut">Laden…</p>';window.scrollTo(0,0);
+  state.relaties=await api('GET','relaties');state.instellingen=await api('GET','instellingen');if(!state.modus){state.modus=state.instellingen.modus||'zakelijk';if(p==='dashboard'&&state.modus==='prive'){p='priveov';state.page=p}nav()}
   const ib=await api('GET','inbox');state.inboxN=ib.bestanden.length+ib.concepten.length;nav();
-  await ({dashboard,inbox,bank,boekingen,btw,verrekening,facturen,abonnementen,relaties,instellingen,uren,prijs}[p])();}
+  await ({dashboard,inbox,bank,boekingen,btw,verrekening,facturen,abonnementen,relaties,instellingen,uren,prijs,priveov,privemut,privevast,priveprog}[p])();}
 
 
 /* ------------------------------------------------ bank afstemmen */
@@ -615,6 +621,162 @@ function editOpdracht(id){
   if(id)$('#del',m).onclick=async()=>{if(!confirm('Opdracht verwijderen? Dit kan alleen zonder uren.'))return;await api('DELETE','opdrachten/'+id);m.close();uren()};
 }
 
+/* ------------------------------------------------ privé */
+const PCAT=['Wonen','Boodschappen','Eten & drinken','Vervoer','Verzekeringen','Abonnementen','Gezondheid','Vrije tijd','Kleding','Sparen','Belasting','Overig'];
+const MND=['jan','feb','mrt','apr','mei','jun','jul','aug','sep','okt','nov','dec'];
+const perMaand=(v)=>({maandelijks:v.bedrag,kwartaal:v.bedrag/3,jaarlijks:v.bedrag/12})[v.interval]??v.bedrag;
+const catLijst=(extra=[])=>[...new Set([...PCAT,...extra.filter(Boolean)])];
+// Alles wat privé is: eigen mutaties + de samengevatte privé-uitgaven met de Wise-kaart uit de zakelijke boekingen
+async function priveData(jaar){
+  const [mut,bk,vast]=await Promise.all([api('GET',`prive/mutaties?van=${jaar}-01-01&tot=${jaar}-12-31`),api('GET','boekingen?jaar='+jaar),api('GET','prive/vast')]);
+  const wise=bk.filter(b=>b.soort==='prive_uitgave'&&b.status!=='concept').map(b=>({id:'b'+b.id,datum:b.datum,soort:'uitgave',bedrag:b.bedrag_excl+b.btw_bedrag,categorie:'Wise-kaart (samengevat)',omschrijving:b.omschrijving,bron:'wise'}));
+  return {mut:mut.map(m=>({...m,bron:'prive'})),wise,vast};
+}
+function priveNav(){return state.modus==='prive'}
+
+async function priveov(){
+  const j=state.jaar,d=await priveData(j);
+  const alle=[...d.mut,...d.wise];
+  const mnd=Array.from({length:12},(_,i)=>{const k=`${j}-${String(i+1).padStart(2,'0')}`;const l=alle.filter(x=>x.datum.startsWith(k));
+    return {n:MND[i],ink:l.filter(x=>x.soort==='inkomen').reduce((a,x)=>a+x.bedrag,0),uit:l.filter(x=>x.soort==='uitgave').reduce((a,x)=>a+x.bedrag,0)}});
+  const ink=mnd.reduce((a,m)=>a+m.ink,0),uit=mnd.reduce((a,m)=>a+m.uit,0);
+  const huidig=new Date().getFullYear()===j?new Date().getMonth()+1:12;
+  const cats={};alle.filter(x=>x.soort==='uitgave').forEach(x=>cats[x.categorie||'Overig']=(cats[x.categorie||'Overig']||0)+x.bedrag);
+  const cl=Object.entries(cats).sort((a,b)=>b[1]-a[1]),mx=cl.length?cl[0][1]:1;
+  const vastU=d.vast.filter(v=>v.actief&&v.soort==='uitgave').reduce((a,v)=>a+perMaand(v),0),vastI=d.vast.filter(v=>v.actief&&v.soort==='inkomen').reduce((a,v)=>a+perMaand(v),0);
+  const mx2=Math.max(1,...mnd.map(m=>Math.max(m.ink,m.uit)));
+  $('#main').innerHTML=`<div class="bar"><h1>Privé · Overzicht</h1><select onchange="state.jaar=+this.value;go('priveov')">${yearOpts(j)}</select><span class="sp"></span><button class="b" onclick="editPmut()">+ Mutatie</button></div>
+  <div class="grid g4" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+   <div class="card stat"><div class="k">Inkomen ${j}</div><div class="big pos">${eur(ink)}</div></div>
+   <div class="card stat"><div class="k">Uitgaven ${j}</div><div class="big">${eur(uit)}</div></div>
+   <div class="card stat"><div class="k">Saldo ${j}</div><div class="big ${ink-uit<0?'neg':'pos'}">${eur(ink-uit)}</div></div>
+   <div class="card stat"><div class="k">Gem. uitgaven per maand</div><div class="big">${eur(uit/huidig)}</div><div class="k">vaste lasten: ${eur(vastU)}/mnd</div></div></div>
+  <h2>Per maand</h2><div class="card"><div style="display:flex;gap:6px;align-items:flex-end;height:110px;margin-bottom:6px">${mnd.map(m=>`<div style="flex:1;display:flex;gap:2px;align-items:flex-end;height:100%" title="${m.n}: inkomen ${eur(m.ink)}, uitgaven ${eur(m.uit)}"><i style="flex:1;background:var(--acc);height:${m.ink/mx2*100}%;border-radius:3px 3px 0 0"></i><i style="flex:1;background:var(--bad);opacity:.75;height:${m.uit/mx2*100}%;border-radius:3px 3px 0 0"></i></div>`).join('')}</div>
+   <div style="display:flex;gap:6px">${mnd.map(m=>`<div class="k" style="flex:1;text-align:center">${m.n}</div>`).join('')}</div>
+   <div class="leg" style="margin-top:8px"><span><b style="background:var(--acc)"></b>Inkomen</span><span><b style="background:var(--bad)"></b>Uitgaven</span></div></div>
+  <div class="grid g2"><div><h2>Uitgaven per categorie</h2>${cl.length?`<div class="card">${cl.map(([c,v])=>`<div style="margin-bottom:8px"><div class="row" style="padding:0"><span>${esc(c)}</span><b>${eur(v)}</b></div><div class="pbar" style="margin:3px 0 0"><i style="width:${v/mx*100}%;background:var(--blue)"></i></div></div>`).join('')}</div>`:'<div class="note info">Nog geen uitgaven dit jaar.</div>'}</div>
+  <div><h2>Verbonden met de zaak</h2><div class="card"><div class="row"><span class="k">Privé-uitgaven met de Wise-kaart (uit de zakelijke boekhouding)</span><b>${eur(d.wise.reduce((a,x)=>a+x.bedrag,0))}</b></div>
+   <div class="k">Deze maandbedragen komen automatisch uit Bank afstemmen en tellen hier mee. Boek je dezelfde uitgaven ook los bij Mutaties, dan tellen ze dubbel.</div>
+   <div class="row" style="margin-top:8px"><span class="k">Vast inkomen per maand</span><b>${eur(vastI)}</b></div></div></div></div>`;
+}
+
+async function privemut(){
+  state.pmaand=state.pmaand||today().slice(0,7);
+  const mnd=state.pmaand,[y,mo]=mnd.split('-').map(Number);
+  const van=mnd+'-01',tot=mnd+'-'+String(new Date(y,mo,0).getDate()).padStart(2,'0');
+  const [mut,bk]=await Promise.all([api('GET',`prive/mutaties?van=${van}&tot=${tot}`),api('GET','boekingen?jaar='+y)]);
+  cache.pmut=mut;
+  const wise=bk.filter(b=>b.soort==='prive_uitgave'&&b.status!=='concept'&&b.datum>=van&&b.datum<=tot);
+  const ink=mut.filter(x=>x.soort==='inkomen').reduce((a,x)=>a+x.bedrag,0),uit=mut.filter(x=>x.soort==='uitgave').reduce((a,x)=>a+x.bedrag,0)+wise.reduce((a,b)=>a+b.bedrag_excl+b.btw_bedrag,0);
+  const cats=catLijst((await api('GET','prive/mutaties?van=2000-01-01&tot=2100-01-01')).map(x=>x.categorie));
+  const naam=new Date(y,mo-1,1).toLocaleDateString('nl-NL',{month:'long',year:'numeric'});
+  $('#main').innerHTML=`<div class="bar"><h1>Privé · Mutaties</h1><span class="sp"></span>
+   <button class="b sec" onclick="state.pmaand=maandStr(new Date(${y},${mo-2},15));go('privemut')">←</button><b style="min-width:130px;text-align:center;text-transform:capitalize">${naam}</b><button class="b sec" onclick="state.pmaand=maandStr(new Date(${y},${mo},15));go('privemut')">→</button></div>
+  <form class="quick" id="pf" style="grid-template-columns:130px 110px 1.2fr 110px 2fr auto"><label class="f"><span>Datum</span><input type="date" name="datum" value="${esc(state.pdatum||today())}"></label>
+   <label class="f"><span>Soort</span><select name="soort"><option value="uitgave">Uitgave</option><option value="inkomen">Inkomen</option></select></label>
+   <label class="f"><span>Categorie</span><input name="categorie" list="pcat" placeholder="Boodschappen"><datalist id="pcat">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></label>
+   <label class="f"><span>Bedrag</span><input type="number" step="0.01" name="bedrag" placeholder="0,00"></label>
+   <label class="f"><span>Omschrijving</span><input name="omschrijving"></label><button class="b" type="submit">Toevoegen</button></form>
+  <div class="grid g4" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr));margin-top:14px">
+   <div class="card stat"><div class="k">Inkomen</div><div class="big pos">${eur(ink)}</div></div><div class="card stat"><div class="k">Uitgaven</div><div class="big">${eur(uit)}</div></div>
+   <div class="card stat"><div class="k">Saldo</div><div class="big ${ink-uit<0?'neg':'pos'}">${eur(ink-uit)}</div></div></div>
+  <h2>Mutaties</h2>${mut.length||wise.length?`<table><thead><tr><th>Datum</th><th>Categorie</th><th>Omschrijving</th><th class="num">Bedrag</th></tr></thead><tbody>
+   ${mut.map(x=>`<tr class="klik" onclick="editPmut(${x.id})"><td>${dat(x.datum)}</td><td><span class="tag">${esc(x.categorie||'Overig')}</span></td><td>${esc(x.omschrijving)}</td><td class="num ${x.soort==='inkomen'?'pos':''}">${x.soort==='inkomen'?'+ ':'− '}${eur(x.bedrag)}</td></tr>`).join('')}
+   ${wise.map(b=>`<tr class="klik" onclick="editBoeking(${b.id})"><td>${dat(b.datum)}</td><td><span class="tag ik">Wise-kaart</span></td><td>${esc(b.omschrijving)} <span class="k">(uit Bank afstemmen)</span></td><td class="num">− ${eur(b.bedrag_excl+b.btw_bedrag)}</td></tr>`).join('')}</tbody></table>`:'<div class="k">Niets geboekt in deze maand.</div>'}`;
+  const f=$('#pf');
+  f.onsubmit=async e=>{e.preventDefault();const b=parseFloat(String(val(f,'bedrag')).replace(',','.'));
+    if(!(b>0)){toast('Vul een bedrag in');return}
+    state.pdatum=val(f,'datum');
+    await api('POST','prive/mutaties',{datum:state.pdatum,soort:val(f,'soort'),categorie:val(f,'categorie'),bedrag:b,omschrijving:val(f,'omschrijving')});
+    state.pmaand=state.pdatum.slice(0,7);toast('Opgeslagen');privemut().then(()=>$('#pf [name=bedrag]').focus())};
+}
+async function editPmut(id){
+  const x=id?(cache.pmut&&cache.pmut.find(u=>u.id===id))||await api('GET','prive/mutaties?van=2000-01-01&tot=2100-01-01').then(l=>l.find(u=>u.id===id)):{datum:today(),soort:'uitgave'};
+  const cats=catLijst();
+  const m=modal(`<h3>${id?'Mutatie bewerken':'Nieuwe mutatie'}</h3><form id="ef" class="fg">
+   <label class="f c2"><span>Datum</span><input type="date" name="datum"></label><label class="f c2"><span>Soort</span><select name="soort"><option value="uitgave">Uitgave</option><option value="inkomen">Inkomen</option></select></label>
+   <label class="f c2"><span>Bedrag (€)</span><input type="number" step="0.01" name="bedrag"></label>
+   <label class="f c3"><span>Categorie</span><input name="categorie" list="pcat2"><datalist id="pcat2">${cats.map(c=>`<option value="${esc(c)}">`).join('')}</datalist></label>
+   <label class="f c3"><span>Omschrijving</span><input name="omschrijving"></label></form>
+   <div class="acts">${id?'<button class="b red l" id="del">Verwijderen</button>':''}<button class="b sec" id="cn">Annuleren</button><button class="b" id="ok">Opslaan</button></div>`);
+  const f=$('#ef',m);setv(f,x);$('#cn',m).onclick=m.close;
+  $('#ok',m).onclick=async()=>{const d={datum:val(f,'datum'),soort:val(f,'soort'),bedrag:parseFloat(String(val(f,'bedrag')).replace(',','.')),categorie:val(f,'categorie'),omschrijving:val(f,'omschrijving')};
+    if(id)await api('PUT','prive/mutaties/'+id,d);else await api('POST','prive/mutaties',d);m.close();go(state.page)};
+  if(id)$('#del',m).onclick=async()=>{await api('DELETE','prive/mutaties/'+id);m.close();go(state.page)};
+}
+
+async function privevast(){
+  const l=await api('GET','prive/vast');cache.pvast=l;
+  const act=l.filter(v=>v.actief),u=act.filter(v=>v.soort==='uitgave').reduce((a,v)=>a+perMaand(v),0),i=act.filter(v=>v.soort==='inkomen').reduce((a,v)=>a+perMaand(v),0);
+  $('#main').innerHTML=`<div class="bar"><h1>Privé · Vaste lasten</h1><span class="sp"></span><button class="b" onclick="editPvast()">+ Toevoegen</button></div>
+  <p class="k" style="margin-top:-8px">Terugkerende uitgaven (huur, verzekeringen, abonnementen) en vast inkomen. Ze worden gebruikt in de prognose.</p>
+  <div class="grid g4" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))"><div class="card stat"><div class="k">Vaste lasten per maand</div><div class="big">${eur(u)}</div></div>
+   <div class="card stat"><div class="k">Vast inkomen per maand</div><div class="big pos">${eur(i)}</div></div><div class="card stat"><div class="k">Houdt over (vast)</div><div class="big ${i-u<0?'neg':'pos'}">${eur(i-u)}</div></div></div>
+  <h2>Overzicht</h2>${l.length?`<table><thead><tr><th>Naam</th><th>Categorie</th><th>Soort</th><th class="num">Bedrag</th><th>Interval</th><th class="num">Per maand</th><th></th></tr></thead><tbody>${l.map(v=>`<tr class="klik" onclick="editPvast(${v.id})"><td><b>${esc(v.naam)}</b></td><td><span class="tag">${esc(v.categorie||'Overig')}</span></td><td>${v.soort==='inkomen'?'Inkomen':'Uitgave'}</td><td class="num">${eur(v.bedrag)}</td><td>${v.interval}</td><td class="num">${eur(perMaand(v))}</td><td>${v.actief?'':'<span class="tag">gestopt</span>'}</td></tr>`).join('')}</tbody></table>`:'<div class="note info">Nog geen vaste lasten. Voeg bijvoorbeeld huur, zorgverzekering en abonnementen toe.</div>'}`;
+}
+function editPvast(id){
+  const v=id?cache.pvast.find(x=>x.id===id):{soort:'uitgave',interval:'maandelijks',actief:1};
+  const m=modal(`<h3>${id?'Bewerken':'Nieuwe vaste post'}</h3><form id="vf" class="fg">
+   <label class="f c3"><span>Naam</span><input name="naam" required></label><label class="f c3"><span>Categorie</span><input name="categorie" list="pcat3"><datalist id="pcat3">${catLijst().map(c=>`<option value="${esc(c)}">`).join('')}</datalist></label>
+   <label class="f c2"><span>Soort</span><select name="soort"><option value="uitgave">Uitgave</option><option value="inkomen">Inkomen</option></select></label>
+   <label class="f c2"><span>Bedrag (€)</span><input type="number" step="0.01" name="bedrag"></label>
+   <label class="f c2"><span>Interval</span><select name="interval"><option value="maandelijks">Maandelijks</option><option value="kwartaal">Per kwartaal</option><option value="jaarlijks">Jaarlijks</option></select></label>
+   <label class="f c3"><span><input type="checkbox" name="actief"> Actief</span></label></form>
+   <div class="acts">${id?'<button class="b red l" id="del">Verwijderen</button>':''}<button class="b sec" id="cn">Annuleren</button><button class="b" id="ok">Opslaan</button></div>`);
+  const f=$('#vf',m);setv(f,v);$('#cn',m).onclick=m.close;
+  $('#ok',m).onclick=async()=>{if(!f.reportValidity())return;const d={naam:val(f,'naam'),categorie:val(f,'categorie'),soort:val(f,'soort'),bedrag:parseFloat(String(val(f,'bedrag')).replace(',','.'))||0,interval:val(f,'interval'),actief:val(f,'actief')?1:0};
+    if(id)await api('PUT','prive/vast/'+id,d);else await api('POST','prive/vast',d);m.close();privevast()};
+  if(id)$('#del',m).onclick=async()=>{if(!confirm('Verwijderen?'))return;await api('DELETE','prive/vast/'+id);m.close();privevast()};
+}
+
+/* prognose */
+const PP0={start:0,opname:2500,extra_uit:0,schommel:0,maanden:12,variabel:null};
+function ppLaad(){let m={};try{m=JSON.parse(state.instellingen.prive_prognose||'{}')}catch(e){}return {...PP0,...m}}
+let _ppT;function ppBewaar(m){clearTimeout(_ppT);_ppT=setTimeout(async()=>{state.instellingen.prive_prognose=JSON.stringify(m);await api('PUT','instellingen',{prive_prognose:state.instellingen.prive_prognose})},600)}
+async function priveprog(){
+  const nu=new Date(),j=nu.getFullYear();
+  const d=await priveData(j),alle=[...d.mut,...d.wise].filter(x=>x.soort==='uitgave');
+  // gemiddelde variabele uitgaven: laatste 3 volle maanden met data
+  const mk=[1,2,3].map(i=>{const x=new Date(nu.getFullYear(),nu.getMonth()-i,15);return maandStr(x)});
+  const vorig=await priveData(j-1);
+  const alleJr=[...vorig.mut,...vorig.wise,...d.mut,...d.wise].filter(x=>x.soort==='uitgave'&&mk.some(k=>x.datum.startsWith(k)));
+  const gemVar=alleJr.reduce((a,x)=>a+x.bedrag,0)/3;
+  const vastU=d.vast.filter(v=>v.actief&&v.soort==='uitgave').reduce((a,v)=>a+perMaand(v),0),vastI=d.vast.filter(v=>v.actief&&v.soort==='inkomen').reduce((a,v)=>a+perMaand(v),0);
+  const m=ppLaad();if(m.variabel==null)m.variabel=Math.round(gemVar);
+  $('#main').innerHTML=`<div class="bar"><h1>Privé · Prognose</h1></div>
+  <p class="k" style="margin-top:-8px">Hoeveel blijft er over de komende maanden? Pas aan en je ziet direct het effect. Je kunt rekenen in de vakken. Wijzigingen worden bewaard.</p>
+  <div class="rv" style="grid-template-columns:minmax(0,320px) minmax(0,1fr)"><div class="card" id="ppin">
+   <label class="f" style="display:block;margin-bottom:8px"><span>Huidig privé-saldo (€)</span><input type="number" step="any" name="start"></label>
+   <label class="f" style="display:block;margin-bottom:8px"><span>Opname uit de zaak per maand (€)</span><input type="number" step="any" name="opname"></label>
+   <label class="f" style="display:block;margin-bottom:8px"><span>Variabele uitgaven per maand (€) <span class="k">gemiddelde laatste 3 mnd: ${eur(gemVar)}</span></span><input type="number" step="any" name="variabel"></label>
+   <label class="f" style="display:block;margin-bottom:8px"><span>Extra uitgaven per maand (€) <span class="k">bijv. nieuwe lening</span></span><input type="number" step="any" name="extra_uit"></label>
+   <label class="f" style="display:block;margin-bottom:8px"><span>Schommeling opname (%) <span class="k">−30 = slechte maanden</span></span><input type="number" step="any" name="schommel"></label>
+   <label class="f" style="display:block"><span>Aantal maanden vooruit</span><input type="number" step="1" name="maanden"></label>
+   <div class="k" style="margin-top:10px">Vaste lasten (${eur(vastU)}) en vast inkomen (${eur(vastI)}) komen uit het tabblad Vaste lasten.</div></div><div id="ppout"></div></div>`;
+  const f=$('#ppin');setv(f,m);
+  const upd=()=>{const x={};['start','opname','variabel','extra_uit','schommel','maanden'].forEach(k=>x[k]=parseFloat(val(f,k))||0);x.maanden=Math.min(36,Math.max(1,Math.round(x.maanden)||12));ppBewaar(x);ppToon(x,vastU,vastI)};
+  f.addEventListener('input',upd);ppToon(m,vastU,vastI);
+}
+function ppToon(m,vastU,vastI){
+  const inkM=(m.opname*(1+m.schommel/100)+vastI),uitM=vastU+m.variabel+m.extra_uit,nettoM=inkM-uitM;
+  let s=m.start;const rij=[];const nu=new Date();
+  for(let i=0;i<m.maanden;i++){s+=nettoM;const dd=new Date(nu.getFullYear(),nu.getMonth()+i+1,1);rij.push({n:dd.toLocaleDateString('nl-NL',{month:'short',year:'2-digit'}),saldo:s})}
+  const lo=Math.min(m.start,...rij.map(r=>r.saldo)),hi=Math.max(m.start,...rij.map(r=>r.saldo)),span=(hi-lo)||1;
+  const W=560,H=140,x=i=>20+i*(W-40)/Math.max(1,rij.length-1),y=v=>H-14-(v-lo)/span*(H-34);
+  const nul=lo<0&&hi>0?`<line x1="20" x2="${W-20}" y1="${y(0)}" y2="${y(0)}" stroke="var(--line)" stroke-dasharray="4"/>`:'';
+  const pts=rij.map((r,i)=>`${x(i)},${y(r.saldo)}`).join(' ');
+  const maandenBuffer=uitM>0?m.start/uitM:0,neg=rij.find(r=>r.saldo<0);
+  $('#ppout').innerHTML=`<div class="grid g4" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+   <div class="card stat"><div class="k">Inkomen per maand</div><div class="big pos">${eur(inkM)}</div></div>
+   <div class="card stat"><div class="k">Uitgaven per maand</div><div class="big">${eur(uitM)}</div></div>
+   <div class="card stat"><div class="k">Houdt over per maand</div><div class="big ${nettoM<0?'neg':'pos'}">${eur(nettoM)}</div></div>
+   <div class="card stat"><div class="k">Buffer nu</div><div class="big">${maandenBuffer.toFixed(1).replace('.',',')} mnd</div><div class="k">van je uitgaven</div></div></div>
+  ${neg?`<div class="note" style="margin-top:14px">Bij deze aannames komt je privé-saldo onder nul in ${esc(neg.n)}.</div>`:`<div class="note ok" style="margin-top:14px">Je saldo blijft positief de komende ${m.maanden} maanden.</div>`}
+  <h2>Saldo-verloop</h2><div class="card"><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${nul}<polyline points="${pts}" fill="none" stroke="var(--blue)" stroke-width="2.5"/>${rij.map((r,i)=>`<circle cx="${x(i)}" cy="${y(r.saldo)}" r="3" fill="${r.saldo<0?'var(--bad)':'var(--blue)'}"/>`).join('')}
+   ${rij.filter((_,i)=>i%Math.ceil(rij.length/8)===0||i===rij.length-1).map(r=>`<text x="${x(rij.indexOf(r))}" y="${H-1}" font-size="10" text-anchor="middle" fill="var(--mut)">${r.n}</text>`).join('')}</svg></div>
+  <table style="margin-top:14px"><thead><tr><th>Maand</th><th class="num">Inkomen</th><th class="num">Uitgaven</th><th class="num">Saldo einde maand</th></tr></thead><tbody>${rij.map(r=>`<tr><td>${r.n}</td><td class="num">${eur(inkM)}</td><td class="num">${eur(uitM)}</td><td class="num ${r.saldo<0?'neg':''}"><b>${eur(r.saldo)}</b></td></tr>`).join('')}</tbody></table>`;
+}
+
 /* ------------------------------------------------ relaties */
 async function relaties(){
   const l=state.relaties;cache.rel=l;
@@ -641,7 +803,7 @@ async function instellingen(){
   const vb=verborgen();
   $('#main').innerHTML=`<div class="bar"><h1>Instellingen</h1></div>
   <div class="card" style="margin-bottom:14px"><h3 style="margin-top:0">Zichtbaar in het menu</h3><div class="k" style="margin-bottom:8px">Vink onderdelen uit die je niet gebruikt. De gegevens blijven bewaard.</div>
-   <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 14px">${GROEPEN.flatMap(([,l])=>l).map(([k,t])=>`<label><input type="checkbox" class="navk" data-k="${k}" ${vb.includes(k)?'':'checked'} ${VAST.includes(k)?'disabled':''}> ${t}</label>`).join('')}</div></div>
+   <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 14px">${[...GROEPEN,...GROEPEN_PRIVE.slice(0,1)].flatMap(([g,l])=>l.map(([k,t])=>[k,(g==='Privé'?'Privé · ':'')+t])).map(([k,t])=>`<label><input type="checkbox" class="navk" data-k="${k}" ${vb.includes(k)?'':'checked'} ${VAST.includes(k)?'disabled':''}> ${t}</label>`).join('')}</div></div>
   <div class="card"><form id="sf" class="fg">
    ${fld('bedrijfsnaam','Bedrijfsnaam (eenmanszaak)')}${fld('naam','Jouw naam')}${fld('adres','Adres')}${fld('postcode_plaats','Postcode, plaats')}${fld('iban','IBAN')}${fld('btw_nr','Btw-nummer')}${fld('kvk','KvK-nummer')}${fld('email','E-mail')}${fld('telefoon','Telefoon')}${fld('handelsnaam','Handelsnaam samenwerking')}
    ${fld('partner_naam','Bedrijf van je compagnon')}${fld('partner_contact','Naam compagnon')}
