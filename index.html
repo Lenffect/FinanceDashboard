@@ -115,8 +115,11 @@ function lastQ(){const d=new Date();let q=Math.floor(d.getMonth()/3)+1,y=d.getFu
 const GROEPEN=[['Werk',[['dashboard','Overzicht'],['uren','Uren'],['facturen','Facturen'],['prijs','Prijscalculator']]],
  ['Boekhouding',[['inbox','Inbox'],['bank','Bank afstemmen'],['boekingen','Boekingen'],['btw','Btw-aangifte'],['verrekening','Verrekening Jelmer']]],
  ['Beheer',[['abonnementen','Abonnementen'],['relaties','Klanten & leveranciers'],['instellingen','Instellingen']]]];
+const VAST=['dashboard','instellingen'];
+function verborgen(){try{return JSON.parse(state.instellingen.nav_verborgen||'[]')}catch(e){return[]}}
 function nav(){
-  $('#nav').innerHTML=GROEPEN.map(([g,l])=>`<h6>${g}</h6>`+l.map(([k,t])=>`<button class="${state.page===k?'on':''}" data-p="${k}">${t}${k==='inbox'&&state.inboxN?` <span class="tag flag">${state.inboxN}</span>`:''}</button>`).join('')).join('');
+  const vb=verborgen();
+  $('#nav').innerHTML=GROEPEN.map(([g,l])=>[g,l.filter(([k])=>!vb.includes(k)||k===state.page)]).filter(([,l])=>l.length).map(([g,l])=>`<h6>${g}</h6>`+l.map(([k,t])=>`<button class="${state.page===k?'on':''}" data-p="${k}">${t}${k==='inbox'&&state.inboxN?` <span class="tag flag">${state.inboxN}</span>`:''}</button>`).join('')).join('');
   $$('#nav button').forEach(b=>b.onclick=()=>go(b.dataset.p));
 }
 async function go(p){state.page=p;nav();$('#main').innerHTML='<p class="mut">Laden…</p>';window.scrollTo(0,0);
@@ -635,7 +638,11 @@ function editRel(id){
 async function instellingen(){
   const s=state.instellingen;
   const fld=(k,l,c='c3')=>`<label class="f ${c}"><span>${l}</span><input name="${k}"></label>`;
-  $('#main').innerHTML=`<div class="bar"><h1>Instellingen</h1></div><div class="card"><form id="sf" class="fg">
+  const vb=verborgen();
+  $('#main').innerHTML=`<div class="bar"><h1>Instellingen</h1></div>
+  <div class="card" style="margin-bottom:14px"><h3 style="margin-top:0">Zichtbaar in het menu</h3><div class="k" style="margin-bottom:8px">Vink onderdelen uit die je niet gebruikt. De gegevens blijven bewaard.</div>
+   <div class="grid" style="grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:4px 14px">${GROEPEN.flatMap(([,l])=>l).map(([k,t])=>`<label><input type="checkbox" class="navk" data-k="${k}" ${vb.includes(k)?'':'checked'} ${VAST.includes(k)?'disabled':''}> ${t}</label>`).join('')}</div></div>
+  <div class="card"><form id="sf" class="fg">
    ${fld('bedrijfsnaam','Bedrijfsnaam (eenmanszaak)')}${fld('naam','Jouw naam')}${fld('adres','Adres')}${fld('postcode_plaats','Postcode, plaats')}${fld('iban','IBAN')}${fld('btw_nr','Btw-nummer')}${fld('kvk','KvK-nummer')}${fld('email','E-mail')}${fld('telefoon','Telefoon')}${fld('handelsnaam','Handelsnaam samenwerking')}
    ${fld('partner_naam','Bedrijf van je compagnon')}${fld('partner_contact','Naam compagnon')}
    <label class="f c6"><span>Voetregel op facturen van de samenwerking (elke regel een regel)</span><textarea name="voetregel_fluid" rows="2"></textarea></label>
@@ -647,6 +654,8 @@ async function instellingen(){
    <p class="k">Elke keer dat de app start of afsluit wordt de export bijgewerkt: csv per tabel, één json-bestand, een kopie van de database, een samenvatting en de gekoppelde facturen.</p>
    <p class="k">Bij elke start en bij het afsluiten van de app wordt de export bijgewerkt: csv per tabel, één json-bestand, een kopie van de database, een samenvatting en de gekoppelde facturen.</p>
    <p class="k">Je gegevens staan in <code>data/administratie.db</code> naast dit programma. Bij elke start maakt de app automatisch een back-up in <code>data/backup</code>.</p>`;
+  $$('.navk').forEach(c=>c.onchange=async()=>{const v=$$('.navk').filter(x=>!x.checked).map(x=>x.dataset.k);
+    state.instellingen=await api('PUT','instellingen',{nav_verborgen:JSON.stringify(v)});nav()});
   const f=$('#sf');setv(f,s);
   $('#ok').onclick=async()=>{const d={};$$('[name]',f).forEach(x=>d[x.name]=x.value);state.instellingen=await api('PUT','instellingen',d);toast('Opgeslagen')};
   $('#ex').onclick=async()=>{const d={};$$('[name]',f).forEach(x=>d[x.name]=x.value);await api('PUT','instellingen',d);const r=await api('POST','export',{});toast('Export bijgewerkt: '+r.map)};
