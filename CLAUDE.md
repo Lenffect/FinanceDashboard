@@ -37,5 +37,5 @@ Afschrijving iPhone en MacBook; ING-promotie €150 (winst?); Nederlandse btw op
 - Commit klein en beschrijvend (Nederlands of Engels, consistent). Geen database, facturen of bankbestanden committen.
 
 ## Privé (Lennar Finance)
-- Privé-gegevens (tabellen `prive_*`, bankafschriften uit `inbox/`) blijven **lokaal**: `export.py` slaat ze over (de exportmap staat in iCloud) en haalt ze uit de database-kopie. Houd dat zo bij nieuwe tabellen.
+- Privé-gegevens (tabellen `prive_*`, bankafschriften uit `inbox/`) blijven **lokaal**: `export.py` zet ze niet in de leesbare export (csv/json/xlsx), alleen in de volledige database-kopie `administratie_kopie.db` in de iCloud-exportmap (door Lennar goedgekeurd als eigen backup). Houd dat zo bij nieuwe tabellen.
 - `prive_bank.py`: leest ING-csv (lopend + spaar), markeert interne overboekingen (eigen rekeningen, spaar, Wise) zodat ze niet als inkomen/uitgave tellen.

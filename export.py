@@ -150,7 +150,7 @@ def exporteer(base, db_pad, doelmap, samenvatting_tekst=None, dash=None):
         tabellen.sort(key=lambda t: (TABELLEN_VOLGORDE.index(t) if t in TABELLEN_VOLGORDE else 99, t))
         for t in tabellen:
             if t.startswith('prive_'):
-                continue  # privé-gegevens blijven lokaal: nooit in de export (die kan in iCloud staan)
+                continue  # privé-gegevens niet als leesbare csv/json/xlsx in de export; alleen in de volledige database-kopie (door Lennar goedgekeurd)
             kol, rijen = _rijen(c, t)
             if t == 'instellingen':
                 i = kol.index('sleutel')
@@ -169,11 +169,6 @@ def exporteer(base, db_pad, doelmap, samenvatting_tekst=None, dash=None):
             os.remove(tmp)
         with closing(sqlite3.connect(tmp)) as d:
             c.backup(d)
-            for t in [r[0] for r in d.execute("SELECT name FROM sqlite_master WHERE type='table' AND name LIKE 'prive\\_%' ESCAPE '\\'")]:
-                d.execute('DROP TABLE "%s"' % t)
-            d.execute("DELETE FROM instellingen WHERE sleutel LIKE 'prive\\_%' ESCAPE '\\' OR sleutel='modus'")
-            d.commit()
-            d.execute('VACUUM')
         os.replace(tmp, kopie)
     meta = {'geexporteerd_op': nu.isoformat(timespec='seconds'), 'tabellen': {t: len(r) for t, r in alles.items()}}
     _schrijf_atomair(os.path.join(doelmap, 'administratie.json'), json.dumps({'meta': meta, **alles}, ensure_ascii=False, indent=1, default=str))
