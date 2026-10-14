@@ -634,28 +634,37 @@ async function priveData(jaar){
 }
 function priveNav(){return state.modus==='prive'}
 
+function pmStap(n){let m=(state.pm||1)+n,j=state.jaar;if(m<1){m=12;j--}if(m>12){m=1;j++}state.pm=m;state.jaar=j;go('priveov')}
 async function priveov(){
   const j=state.jaar,d=await priveData(j),saldos=await api('GET','prive/saldos');
-  const alle=[...d.mut,...d.wise];
-  const mnd=Array.from({length:12},(_,i)=>{const k=`${j}-${String(i+1).padStart(2,'0')}`;const l=alle.filter(x=>x.datum.startsWith(k));
-    return {n:MND[i],ink:l.filter(x=>x.soort==='inkomen').reduce((a,x)=>a+x.bedrag,0),uit:l.filter(x=>x.soort==='uitgave').reduce((a,x)=>a+x.bedrag,0)}});
-  const ink=mnd.reduce((a,m)=>a+m.ink,0),uit=mnd.reduce((a,m)=>a+m.uit,0);
-  const huidig=new Date().getFullYear()===j?new Date().getMonth()+1:12;
-  const cats={};alle.filter(x=>x.soort==='uitgave').forEach(x=>cats[x.categorie||'Overig']=(cats[x.categorie||'Overig']||0)+x.bedrag);
+  const alle=[...d.mut,...d.wise],pm=state.pm||0,pad2=n=>String(n).padStart(2,'0');
+  const sel=pm?alle.filter(x=>x.datum.startsWith(`${j}-${pad2(pm)}`)):alle;
+  const som=(l,s_)=>l.filter(x=>x.soort===s_).reduce((a,x)=>a+x.bedrag,0);
+  // grafiek: per maand (heel jaar) of per dag (gekozen maand)
+  const dagenInMnd=pm?new Date(j,pm,0).getDate():0;
+  const mnd=pm?Array.from({length:dagenInMnd},(_,i)=>{const l=sel.filter(x=>x.datum===`${j}-${pad2(pm)}-${pad2(i+1)}`);return {n:String(i+1),ink:som(l,'inkomen'),uit:som(l,'uitgave')}})
+    :Array.from({length:12},(_,i)=>{const l=alle.filter(x=>x.datum.startsWith(`${j}-${pad2(i+1)}`));return {n:MND[i],ink:som(l,'inkomen'),uit:som(l,'uitgave')}});
+  const ink=som(sel,'inkomen'),uit=som(sel,'uitgave'),per=pm?`${MND[pm-1]} ${j}`:j;
+  const nu=new Date(),loopt=nu.getFullYear()===j&&(!pm||nu.getMonth()+1===pm);
+  const huidig=pm?(loopt?nu.getDate():dagenInMnd):(nu.getFullYear()===j?nu.getMonth()+1:12);
+  const cats={};sel.filter(x=>x.soort==='uitgave').forEach(x=>cats[x.categorie||'Overig']=(cats[x.categorie||'Overig']||0)+x.bedrag);
   const cl=Object.entries(cats).sort((a,b)=>b[1]-a[1]),mx=cl.length?cl[0][1]:1;
   const vastU=d.vast.filter(v=>v.actief&&v.soort==='uitgave').reduce((a,v)=>a+perMaand(v),0),vastI=d.vast.filter(v=>v.actief&&v.soort==='inkomen').reduce((a,v)=>a+perMaand(v),0);
   const mx2=Math.max(1,...mnd.map(m=>Math.max(m.ink,m.uit)));
-  $('#main').innerHTML=`<div class="bar"><h1>Privé · Overzicht</h1><select onchange="state.jaar=+this.value;go('priveov')">${yearOpts(j)}</select><span class="sp"></span><button class="b" onclick="editPmut()">+ Mutatie</button></div>
+  $('#main').innerHTML=`<div class="bar"><h1>Privé · Overzicht</h1><select onchange="state.jaar=+this.value;go('priveov')">${yearOpts(j)}</select>
+   <select onchange="state.pm=+this.value;go('priveov')"><option value="0">Heel jaar</option>${MND.map((n,i)=>`<option value="${i+1}" ${pm===i+1?'selected':''}>${new Date(2000,i,1).toLocaleDateString('nl-NL',{month:'long'})}</option>`).join('')}</select>
+   ${pm?`<button class="b sec" onclick="pmStap(-1)">←</button><button class="b sec" onclick="pmStap(1)">→</button>`:''}<span class="sp"></span><button class="b" onclick="editPmut()">+ Mutatie</button></div>
   <div class="grid g4" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
-   <div class="card stat"><div class="k">Inkomen ${j}</div><div class="big pos">${eur(ink)}</div></div>
-   <div class="card stat"><div class="k">Uitgaven ${j}</div><div class="big">${eur(uit)}</div></div>
-   <div class="card stat"><div class="k">Saldo ${j}</div><div class="big ${ink-uit<0?'neg':'pos'}">${eur(ink-uit)}</div></div>
-   <div class="card stat"><div class="k">Gem. uitgaven per maand</div><div class="big">${eur(uit/huidig)}</div><div class="k">vaste lasten: ${eur(vastU)}/mnd</div></div></div>
+   <div class="card stat"><div class="k">Inkomen ${per}</div><div class="big pos">${eur(ink)}</div></div>
+   <div class="card stat"><div class="k">Uitgaven ${per}</div><div class="big">${eur(uit)}</div></div>
+   <div class="card stat"><div class="k">Saldo ${per}</div><div class="big ${ink-uit<0?'neg':'pos'}">${eur(ink-uit)}</div></div>
+   <div class="card stat"><div class="k">Gem. uitgaven per ${pm?'dag':'maand'}</div><div class="big">${eur(uit/huidig)}</div><div class="k">vaste lasten: ${eur(vastU)}/mnd</div></div></div>
   ${saldos.length?`<h2>Saldo's (laatste afschrift)</h2><div class="grid g4" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">${saldos.map(r=>`<div class="card stat"><div class="k">${esc(r.rekening)}</div><div class="big">${eur(r.saldo)}</div><div class="k">per ${dat(r.datum)}</div></div>`).join('')}<div class="card stat"><div class="k">Totaal</div><div class="big">${eur(saldos.reduce((a,r)=>a+r.saldo,0))}</div></div></div>`:''}
-  <h2>Per maand</h2><div class="card"><div style="display:flex;gap:6px;align-items:flex-end;height:110px;margin-bottom:6px">${mnd.map(m=>`<div style="flex:1;display:flex;gap:2px;align-items:flex-end;height:100%" title="${m.n}: inkomen ${eur(m.ink)}, uitgaven ${eur(m.uit)}"><i style="flex:1;background:var(--acc);height:${m.ink/mx2*100}%;border-radius:3px 3px 0 0"></i><i style="flex:1;background:var(--bad);opacity:.75;height:${m.uit/mx2*100}%;border-radius:3px 3px 0 0"></i></div>`).join('')}</div>
-   <div style="display:flex;gap:6px">${mnd.map(m=>`<div class="k" style="flex:1;text-align:center">${m.n}</div>`).join('')}</div>
+  <h2>${pm?'Per dag':'Per maand'}</h2><div class="card"><div style="display:flex;gap:${pm?2:6}px;align-items:flex-end;height:110px;margin-bottom:6px">${mnd.map((m,i)=>`<div ${pm?'':`onclick="state.pm=${i+1};go('priveov')"`} style="flex:1;display:flex;gap:2px;align-items:flex-end;height:100%;${pm?'':'cursor:pointer'}" title="${m.n}: inkomen ${eur(m.ink)}, uitgaven ${eur(m.uit)}"><i style="flex:1;background:var(--acc);height:${m.ink/mx2*100}%;border-radius:3px 3px 0 0"></i><i style="flex:1;background:var(--bad);opacity:.75;height:${m.uit/mx2*100}%;border-radius:3px 3px 0 0"></i></div>`).join('')}</div>
+   <div style="display:flex;gap:${pm?2:6}px">${mnd.map((m,i)=>`<div class="k" style="flex:1;text-align:center;${pm&&dagenInMnd>16&&i%2?'visibility:hidden':''}">${m.n}</div>`).join('')}</div>
    <div class="leg" style="margin-top:8px"><span><b style="background:var(--acc)"></b>Inkomen</span><span><b style="background:var(--bad)"></b>Uitgaven</span></div></div>
   <div class="grid g2"><div><h2>Uitgaven per categorie</h2>${cl.length?`<div class="card">${cl.map(([c,v])=>`<div style="margin-bottom:8px"><div class="row" style="padding:0"><span>${esc(c)}</span><b>${eur(v)}</b></div><div class="pbar" style="margin:3px 0 0"><i style="width:${v/mx*100}%;background:var(--blue)"></i></div></div>`).join('')}</div>`:'<div class="note info">Nog geen uitgaven dit jaar.</div>'}</div>
+  ${pm?`<div style="grid-column:1/-1"><h2>Mutaties in ${new Date(j,pm-1,1).toLocaleDateString('nl-NL',{month:'long'})} <button class="lnk" onclick="state.pmaand='${j}-${pad2(pm)}';go('privemut')">openen bij Mutaties →</button></h2>${sel.length?`<table><tbody>${[...sel].sort((a,b)=>b.datum.localeCompare(a.datum)).slice(0,60).map(x=>`<tr><td style="width:100px;white-space:nowrap">${dat(x.datum)}</td><td><span class="tag ${x.categorie?'':'flag'}">${esc(x.categorie||'Zonder categorie')}</span></td><td>${esc(x.omschrijving)}</td><td class="num ${x.soort==='inkomen'?'pos':''}">${x.soort==='inkomen'?'+ ':'− '}${eur(x.bedrag)}</td></tr>`).join('')}</tbody></table>`:'<div class="k">Geen mutaties in deze maand.</div>'}</div>`:''}
   <div><h2>Verbonden met de zaak</h2><div class="card"><div class="row"><span class="k">Interne overboekingen (spaar, eigen rekeningen, Wise) buiten de totalen</span><b>${d.intern.length}</b></div><div class="row"><span class="k">Privé-uitgaven met de Wise-kaart (uit de zakelijke boekhouding)</span><b>${eur(d.wise.reduce((a,x)=>a+x.bedrag,0))}</b></div>
    <div class="k">Deze maandbedragen komen automatisch uit Bank afstemmen en tellen hier mee. Boek je dezelfde uitgaven ook los bij Mutaties, dan tellen ze dubbel.</div>
    <div class="row" style="margin-top:8px"><span class="k">Vast inkomen per maand</span><b>${eur(vastI)}</b></div></div></div></div>`;
