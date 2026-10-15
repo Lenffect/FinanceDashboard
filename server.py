@@ -297,6 +297,22 @@ def clean_cat(d):
             'icoon': (d.get('icoon') or '📦').strip()[:8], 'kleur': kleur}
 
 
+def zakelijk_saldo_info():
+    """Saldo zakelijke betaalrekening (ING) voor het vermogen: laatst afgestemde bankstand, anders berekend; plus historie per maand-eind."""
+    cfg = settings()
+    werkelijk = cfg.get('ing_saldo_werkelijk')
+    saldo = float(werkelijk) if werkelijk not in (None, '') else ing_saldo()
+    hist, eerste = [], q('SELECT MIN(COALESCE(betaaldatum,datum)) d FROM boekingen WHERE rekening=\'ing\'', one=True)['d']
+    if eerste:
+        y, m = int(eerste[:4]), int(eerste[5:7])
+        vandaag = dt.date.today()
+        while (y, m) < (vandaag.year, vandaag.month):
+            eind = (dt.date(y + (m == 12), m % 12 + 1, 1) - dt.timedelta(days=1)).isoformat()
+            hist.append([eind, ing_saldo(eind)])
+            y, m = y + (m == 12), m % 12 + 1
+    return {'saldo': r2(saldo), 'datum': cfg.get('ing_saldo_datum') or '', 'berekend': werkelijk in (None, ''), 'hist': hist}
+
+
 def prive_vermogen():
     """Bezittingen/schulden + bankrekeningen (uit saldo_na) en hun historie voor de net-worth-trend."""
     bank_hist = {}
@@ -315,7 +331,7 @@ def prive_vermogen():
             'items': q('SELECT * FROM prive_bezit ORDER BY soort, categorie, naam COLLATE NOCASE'),
             'hist': q('SELECT bezit_id, datum, waarde FROM prive_bezit_hist ORDER BY datum'),
             'bank': {k: sorted(v.items()) for k, v in bank_hist.items()},
-            'saldos': prive_saldos()}
+            'saldos': prive_saldos(), 'zakelijk': zakelijk_saldo_info()}
 
 
 def list_boekingen(p):

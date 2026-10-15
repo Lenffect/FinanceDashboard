@@ -797,7 +797,8 @@ const ICONEN=['🏦','💰','📈','🪙','🌴','🏠','🚗','💻','📱','�
 const KLEUREN=['#0f7b6c','#2383e2','#cb912f','#9065b0','#d9730d','#6b6b6b','#529cca','#448361','#c4554d','#e03e3e','#ad1a72','#9b9a97'];
 function vermogenReeks(v){
   // per maand-eind: laatste bekende waarde per bezit (schulden negatief) + bankrekeningen
-  const pts=[...v.hist.map(h=>h.datum),...Object.values(v.bank).flatMap(l=>l.map(x=>x[0]))].sort();
+  const zk=[...v.zakelijk.hist,[new Date().toISOString().slice(0,10),v.zakelijk.saldo]];
+  const pts=[...v.hist.map(h=>h.datum),...Object.values(v.bank).flatMap(l=>l.map(x=>x[0])),...zk.map(x=>x[0])].sort();
   if(!pts.length)return [];
   const nu=new Date(),eind=new Date(nu.getFullYear(),nu.getMonth(),1);
   let d=new Date(+pts[0].slice(0,4),+pts[0].slice(5,7)-1,1);
@@ -807,7 +808,7 @@ function vermogenReeks(v){
     const laatste=d.getTime()===eind.getTime(),grens=laatste?iso(nu):iso(new Date(d.getFullYear(),d.getMonth()+1,0));
     const last=l=>{let w=null;for(const [dat_,x] of l){if(dat_<=grens)w=x;else break}return w};
     const perBezit={};v.hist.forEach(h=>{if(h.datum<=grens)perBezit[h.bezit_id]=h.waarde});
-    const tot=Object.values(perBezit).reduce((a,x)=>a+x,0)+Object.values(v.bank).reduce((a,l)=>a+(last(l)||0),0);
+    const tot=Object.values(perBezit).reduce((a,x)=>a+x,0)+Object.values(v.bank).reduce((a,l)=>a+(last(l)||0),0)+(last(zk)||0);
     uit.push({n:MND[d.getMonth()]+(d.getMonth()===0||!uit.length?' '+String(d.getFullYear()).slice(2):''),w:tot});
   }
   return uit;
@@ -829,12 +830,13 @@ function blokken(l,totaal,hoogte,leeg){
 }
 async function privevermogen(){
   const v=await api('GET','prive/vermogen');cache.pbezit=v.items;cache.pcats=v.cats;
-  const act=v.items.filter(x=>x.actief),bank=v.saldos.reduce((a,r)=>a+r.saldo,0);
+  const act=v.items.filter(x=>x.actief),bank=v.saldos.reduce((a,r)=>a+r.saldo,0),zak=v.zakelijk.saldo;
   const som=(soort,naam)=>act.filter(x=>x.soort===soort&&x.categorie===naam).reduce((a,x)=>a+x.waarde,0);
   const bl=v.cats.filter(c=>c.soort==='bezit').map(c=>({...c,bedrag:som('bezit',c.naam)}));
   if(bank>0)bl.push({id:0,naam:'Bankrekeningen',icoon:'🏦',kleur:'#4b5563',bedrag:bank});
+  if(zak>0)bl.push({id:0,naam:'Zakelijk (Lenffect)',icoon:'🏢',kleur:'#2383e2',bedrag:zak});
   const sl=v.cats.filter(c=>c.soort==='schuld').map(c=>({...c,bedrag:som('schuld',c.naam)}));
-  const totB=bl.reduce((a,c)=>a+c.bedrag,0)+(bank>0?0:bank),totS=sl.reduce((a,c)=>a+c.bedrag,0),net=totB-totS;
+  const totB=bl.reduce((a,c)=>a+c.bedrag,0)+(bank>0?0:bank)+(zak>0?0:zak),totS=sl.reduce((a,c)=>a+c.bedrag,0),net=totB-totS;
   const reeks=vermogenReeks(v),maandStart=new Date().toISOString().slice(0,8)+'01',heeftHist=new Set(v.hist.map(x=>x.datum.slice(0,7))).size>1;
   const vorig=heeftHist&&reeks.length>1?reeks[reeks.length-2].w:null,delta=vorig===null?null:net-vorig;
   const hi=Math.max(1,...reeks.map(r=>r.w)),lo=Math.min(0,...reeks.map(r=>r.w)),span=hi-lo||1;
@@ -850,7 +852,7 @@ async function privevermogen(){
   ${heeftHist&&reeks.length>1?`<h2>Verloop per maand</h2><div class="card"><div style="display:flex;gap:4px;align-items:stretch;height:130px;margin-bottom:6px">${reeks.map(r=>`<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end" title="${r.n}: ${eur(r.w)}"><i style="display:block;background:${r.w<0?'var(--bad)':'var(--acc)'};height:${Math.max(2,Math.abs(r.w)/span*100)}%;border-radius:3px 3px 0 0;opacity:.85"></i></div>`).join('')}</div>
    <div style="display:flex;gap:4px;font-size:11px;color:var(--mut)">${reeks.map(r=>`<span style="flex:1;text-align:center;overflow:hidden">${r.n}</span>`).join('')}</div>
    <div class="k" style="margin-top:6px">Elke keer dat je een bedrag aanpast, wordt de waarde vastgelegd; bankrekeningen volgen automatisch uit de afschriften.</div></div>`:'<div class="note info">Het verloop verschijnt zodra je bedragen over meerdere maanden hebt bijgewerkt.</div>'}
-  ${v.saldos.length?`<h2>Bankrekeningen (automatisch)</h2><table><tbody>${v.saldos.map(r=>`<tr><td><b>${esc(r.rekening)}</b><div class="k">uit afschriften, per ${dat(r.datum)}</div></td><td class="num">${eur(r.saldo)}</td></tr>`).join('')}</tbody></table>`:''}`;
+  <h2>Bankrekeningen (automatisch)</h2><table><tbody><tr><td><b>Zakelijk · ING Lenffect</b><div class="k">${v.zakelijk.berekend?'berekend uit boekingen':'afgestemd met bank'}${v.zakelijk.datum?', per '+dat(v.zakelijk.datum):''} · incl. btw-reserve en geld van Jelmer</div></td><td class="num">${eur(zak)}</td></tr>${v.saldos.map(r=>`<tr><td><b>${esc(r.rekening)}</b><div class="k">uit afschriften, per ${dat(r.datum)}</div></td><td class="num">${eur(r.saldo)}</td></tr>`).join('')}</tbody></table>`;
 }
 function editCat(id,soort){
   const c=id?cache.pcats.find(y=>y.id===id):{naam:'',soort:soort||'bezit',icoon:'📦',kleur:KLEUREN[1]};
