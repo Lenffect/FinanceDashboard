@@ -65,6 +65,15 @@ h3{font-size:14px;margin:18px 0 6px}
 @media(max-width:800px){.shell{flex-direction:column}aside{width:auto;height:auto;position:static;border-right:0;border-bottom:1px solid var(--line)}nav{flex-direction:row;flex-wrap:wrap}nav h6{display:none}main{padding:20px 16px 80px}.quick{grid-template-columns:1fr 1fr}}
 @media(max-width:700px){.fg{grid-template-columns:1fr 1fr}.fg>*{grid-column:span 2!important}.regel{grid-template-columns:1fr 1fr}.hide-m{display:none}}
 @media print{aside,header,.bar,.noprint,.toast{display:none!important}body{background:#fff}main{padding:0}.card,table{box-shadow:none}}
+
+.tm{position:relative;border-radius:12px;overflow:hidden}.tmb{position:absolute;padding:2px;box-sizing:border-box}
+.tmb>div{position:relative;width:100%;height:100%;border-radius:10px;color:#fff;display:flex;flex-direction:column;justify-content:flex-end;padding:10px 12px;box-sizing:border-box;overflow:hidden;container-type:size;transition:filter .15s}
+.tmb>div:hover{filter:brightness(1.1)}
+.tmb .ti{position:absolute;top:10px;left:12px;font-size:clamp(16px,34cqmin,64px);line-height:1}
+.tmb .tn{font-size:clamp(11px,11cqmin,18px);line-height:1.2}.tmb .tv{font-size:clamp(11px,10cqmin,16px);opacity:.9}.tmb .tp{position:absolute;top:10px;right:12px;font-size:clamp(10px,9cqmin,14px);opacity:.85}
+@container (max-height:62px){.tn,.tv{display:none}}@container (max-height:40px){.tp{display:none}}@container (max-width:70px){.tn,.tv,.tp{display:none}}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.chip{border:1px solid var(--line);background:var(--card);color:var(--tx);border-radius:999px;padding:4px 10px;cursor:pointer;font:inherit;font-size:13px}.chip:hover{background:var(--hover)}
+.pick{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}.pick button{width:34px;height:34px;border-radius:8px;border:2px solid transparent;background:var(--side);cursor:pointer;font-size:18px}.pick button.on{border-color:var(--tx)}.pick input{height:34px}
 </style>
 </head>
 <body>
@@ -115,7 +124,7 @@ function lastQ(){const d=new Date();let q=Math.floor(d.getMonth()/3)+1,y=d.getFu
 const GROEPEN=[['Werk',[['dashboard','Overzicht'],['uren','Uren'],['facturen','Facturen'],['prijs','Prijscalculator']]],
  ['Boekhouding',[['inbox','Inbox'],['bank','Bank afstemmen'],['boekingen','Boekingen'],['btw','Btw-aangifte'],['verrekening','Verrekening Jelmer']]],
  ['Beheer',[['abonnementen','Abonnementen'],['relaties','Klanten & leveranciers'],['instellingen','Instellingen']]]];
-const GROEPEN_PRIVE=[['Privé',[['priveov','Overzicht'],['privemut','Mutaties'],['privevast','Vaste lasten'],['priveprog','Prognose'],['privecat','Categoriseren']]],
+const GROEPEN_PRIVE=[['Privé',[['priveov','Overzicht'],['privevermogen','Vermogen'],['privemut','Mutaties'],['privevast','Vaste lasten'],['priveprog','Prognose'],['privecat','Categoriseren']]],
  ['Beheer',[['instellingen','Instellingen']]]];
 const VAST=['dashboard','priveov','instellingen'];
 const modus=()=>state.modus||state.instellingen.modus||'zakelijk';
@@ -131,7 +140,7 @@ function nav(){
 async function go(p){if(p==='dashboard'&&modus()==='prive')p='priveov';if(p==='priveov'&&modus()!=='prive')state.modus='prive';state.page=p;nav();$('#main').innerHTML='<p class="mut">Laden…</p>';window.scrollTo(0,0);
   state.relaties=await api('GET','relaties');state.instellingen=await api('GET','instellingen');if(!state.modus){state.modus=state.instellingen.modus||'zakelijk';if(p==='dashboard'&&state.modus==='prive'){p='priveov';state.page=p}nav()}
   const ib=await api('GET','inbox');state.inboxN=ib.bestanden.length+ib.concepten.length;nav();
-  await ({dashboard,inbox,bank,boekingen,btw,verrekening,facturen,abonnementen,relaties,instellingen,uren,prijs,priveov,privemut,privevast,priveprog,privecat}[p])();}
+  await ({dashboard,inbox,bank,boekingen,btw,verrekening,facturen,abonnementen,relaties,instellingen,uren,prijs,priveov,privevermogen,privemut,privevast,priveprog,privecat}[p])();}
 
 
 /* ------------------------------------------------ bank afstemmen */
@@ -758,6 +767,100 @@ function editPvast(id){
   $('#ok',m).onclick=async()=>{if(!f.reportValidity())return;const d={naam:val(f,'naam'),categorie:val(f,'categorie'),soort:val(f,'soort'),bedrag:parseFloat(String(val(f,'bedrag')).replace(',','.'))||0,interval:val(f,'interval'),actief:val(f,'actief')?1:0};
     if(id)await api('PUT','prive/vast/'+id,d);else await api('POST','prive/vast',d);m.close();privevast()};
   if(id)$('#del',m).onclick=async()=>{if(!confirm('Verwijderen?'))return;await api('DELETE','prive/vast/'+id);m.close();privevast()};
+}
+
+/* ------------------------------------------------ vermogen (net worth) */
+const ICONEN=['🏦','💰','📈','🪙','🌴','🏠','🚗','💻','📱','🏢','📦','💎','🎓','💳','🧾','🛡️','🏖️','🚲','🎸','📷','🏍️','⌚'];
+const KLEUREN=['#0f7b6c','#2383e2','#cb912f','#9065b0','#d9730d','#6b6b6b','#529cca','#448361','#c4554d','#e03e3e','#ad1a72','#9b9a97'];
+function vermogenReeks(v){
+  // per maand-eind: laatste bekende waarde per bezit (schulden negatief) + bankrekeningen
+  const pts=[...v.hist.map(h=>h.datum),...Object.values(v.bank).flatMap(l=>l.map(x=>x[0]))].sort();
+  if(!pts.length)return [];
+  const nu=new Date(),eind=new Date(nu.getFullYear(),nu.getMonth(),1);
+  let d=new Date(+pts[0].slice(0,4),+pts[0].slice(5,7)-1,1);
+  if((eind.getFullYear()-d.getFullYear())*12+eind.getMonth()-d.getMonth()>35)d=new Date(eind.getFullYear(),eind.getMonth()-35,1);
+  const uit=[],iso=x=>`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
+  for(;d<=eind;d=new Date(d.getFullYear(),d.getMonth()+1,1)){
+    const laatste=d.getTime()===eind.getTime(),grens=laatste?iso(nu):iso(new Date(d.getFullYear(),d.getMonth()+1,0));
+    const last=l=>{let w=null;for(const [dat_,x] of l){if(dat_<=grens)w=x;else break}return w};
+    const perBezit={};v.hist.forEach(h=>{if(h.datum<=grens)perBezit[h.bezit_id]=h.waarde});
+    const tot=Object.values(perBezit).reduce((a,x)=>a+x,0)+Object.values(v.bank).reduce((a,l)=>a+(last(l)||0),0);
+    uit.push({n:MND[d.getMonth()]+(d.getMonth()===0||!uit.length?' '+String(d.getFullYear()).slice(2):''),w:tot});
+  }
+  return uit;
+}
+
+function treemap(items,x,y,w,h,out){
+  if(items.length===1){out.push({...items[0],x,y,bw:w,bh:h});return}
+  const tot=items.reduce((a,i)=>a+i.bedrag,0);let acc=0,k=0;
+  while(k<items.length-1&&acc+items[k].bedrag/2<tot/2)acc+=items[k++].bedrag;
+  k=Math.max(1,k);acc=items.slice(0,k).reduce((a,i)=>a+i.bedrag,0);const f=acc/tot;
+  if(w>=h){treemap(items.slice(0,k),x,y,w*f,h,out);treemap(items.slice(k),x+w*f,y,w*(1-f),h,out)}
+  else{treemap(items.slice(0,k),x,y,w,h*f,out);treemap(items.slice(k),x,y+h*f,w,h*(1-f),out)}
+}
+function blokken(l,totaal,hoogte,leeg){
+  const items=l.filter(i=>i.bedrag>0).sort((a,b)=>b.bedrag-a.bedrag);
+  if(!items.length)return `<div class="note info">${leeg}</div>`;
+  const out=[];treemap(items,0,0,100,100,out);
+  return `<div class="tm" style="height:${hoogte}px">${out.map(r=>`<div class="tmb" style="left:${r.x}%;top:${r.y}%;width:${r.bw}%;height:${r.bh}%"><div ${r.id?`onclick="editCat(${r.id})"`:''} style="background:${r.kleur};${r.id?'cursor:pointer':''}" title="${esc(r.naam)}: ${eur(r.bedrag)}"><span class="ti">${r.icoon}</span><b class="tn">${esc(r.naam)}</b><span class="tv">${eur(r.bedrag)}</span><span class="tp">${totaal?Math.round(r.bedrag/totaal*100):0}%</span></div></div>`).join('')}</div>`;
+}
+async function privevermogen(){
+  const v=await api('GET','prive/vermogen');cache.pbezit=v.items;cache.pcats=v.cats;
+  const act=v.items.filter(x=>x.actief),bank=v.saldos.reduce((a,r)=>a+r.saldo,0);
+  const som=(soort,naam)=>act.filter(x=>x.soort===soort&&x.categorie===naam).reduce((a,x)=>a+x.waarde,0);
+  const bl=v.cats.filter(c=>c.soort==='bezit').map(c=>({...c,bedrag:som('bezit',c.naam)}));
+  if(bank>0)bl.push({id:0,naam:'Bankrekeningen',icoon:'🏦',kleur:'#4b5563',bedrag:bank});
+  const sl=v.cats.filter(c=>c.soort==='schuld').map(c=>({...c,bedrag:som('schuld',c.naam)}));
+  const totB=bl.reduce((a,c)=>a+c.bedrag,0)+(bank>0?0:bank),totS=sl.reduce((a,c)=>a+c.bedrag,0),net=totB-totS;
+  const reeks=vermogenReeks(v),maandStart=new Date().toISOString().slice(0,8)+'01',heeftHist=new Set(v.hist.map(x=>x.datum.slice(0,7))).size>1;
+  const vorig=heeftHist&&reeks.length>1?reeks[reeks.length-2].w:null,delta=vorig===null?null:net-vorig;
+  const hi=Math.max(1,...reeks.map(r=>r.w)),lo=Math.min(0,...reeks.map(r=>r.w)),span=hi-lo||1;
+  $('#main').innerHTML=`<div class="bar"><h1>Privé · Vermogen</h1><span class="sp"></span><button class="b sec" onclick="editCat(0,'schuld')">+ Schuldcategorie</button><button class="b" onclick="editCat(0,'bezit')">+ Categorie</button></div>
+  <div class="grid g4" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
+   <div class="card stat"><div class="k">Netto vermogen</div><div class="big ${net<0?'neg':'pos'}">${eur(net)}</div>${delta===null?'':`<div class="k ${delta<0?'neg':'pos'}">${delta<0?'−':'+'} ${eur(Math.abs(delta))} t.o.v. vorige maand</div>`}</div>
+   <div class="card stat"><div class="k">Bezittingen</div><div class="big">${eur(totB)}</div></div>
+   <div class="card stat"><div class="k">Schulden</div><div class="big ${totS?'neg':''}">${eur(totS)}</div></div></div>
+  <h2>Bezittingen</h2>${blokken(bl,totB,320,'Nog geen bedragen. Klik op "+ Categorie" of kies hieronder een categorie.')}
+  <div class="chips">${v.cats.filter(c=>c.soort==='bezit').map(c=>`<button class="chip" onclick="editCat(${c.id})"><span>${c.icoon}</span> ${esc(c.naam)} <b>${eur(som('bezit',c.naam))}</b></button>`).join('')}</div>
+  <h2>Schulden</h2>${blokken(sl,totS,200,'Geen schulden ingevoerd.')}
+  <div class="chips">${v.cats.filter(c=>c.soort==='schuld').map(c=>`<button class="chip" onclick="editCat(${c.id})"><span>${c.icoon}</span> ${esc(c.naam)} <b>${eur(som('schuld',c.naam))}</b></button>`).join('')}</div>
+  ${heeftHist&&reeks.length>1?`<h2>Verloop per maand</h2><div class="card"><div style="display:flex;gap:4px;align-items:stretch;height:130px;margin-bottom:6px">${reeks.map(r=>`<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end" title="${r.n}: ${eur(r.w)}"><i style="display:block;background:${r.w<0?'var(--bad)':'var(--acc)'};height:${Math.max(2,Math.abs(r.w)/span*100)}%;border-radius:3px 3px 0 0;opacity:.85"></i></div>`).join('')}</div>
+   <div style="display:flex;gap:4px;font-size:11px;color:var(--mut)">${reeks.map(r=>`<span style="flex:1;text-align:center;overflow:hidden">${r.n}</span>`).join('')}</div>
+   <div class="k" style="margin-top:6px">Elke keer dat je een bedrag aanpast, wordt de waarde vastgelegd; bankrekeningen volgen automatisch uit de afschriften.</div></div>`:'<div class="note info">Het verloop verschijnt zodra je bedragen over meerdere maanden hebt bijgewerkt.</div>'}
+  ${v.saldos.length?`<h2>Bankrekeningen (automatisch)</h2><table><tbody>${v.saldos.map(r=>`<tr><td><b>${esc(r.rekening)}</b><div class="k">uit afschriften, per ${dat(r.datum)}</div></td><td class="num">${eur(r.saldo)}</td></tr>`).join('')}</tbody></table>`:''}`;
+}
+function editCat(id,soort){
+  const c=id?cache.pcats.find(y=>y.id===id):{naam:'',soort:soort||'bezit',icoon:'📦',kleur:KLEUREN[1]};
+  const rijen=id?cache.pbezit.filter(x=>x.soort===c.soort&&x.categorie===c.naam).map(x=>({...x})):[];
+  const st={icoon:c.icoon,kleur:c.kleur,rijen,weg:[]};
+  const m=modal(`<h3>${id?'Categorie bewerken':c.soort==='schuld'?'Nieuwe schuldcategorie':'Nieuwe categorie'}</h3>
+   <div style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap"><label class="f" style="flex:1;min-width:180px"><span>Naam</span><input id="cn_" value="${esc(c.naam)}"></label>
+    <div id="cpre" style="width:56px;height:56px;border-radius:10px;display:flex;align-items:center;justify-content:center;font-size:30px"></div></div>
+   <div class="k" style="margin-top:10px">Icoon</div><div class="pick" id="ic">${ICONEN.map(i=>`<button type="button" data-v="${i}">${i}</button>`).join('')}<input id="icx" maxlength="4" placeholder="eigen" style="width:70px"></div>
+   <div class="k" style="margin-top:10px">Kleur</div><div class="pick" id="kl">${KLEUREN.map(k=>`<button type="button" data-v="${k}" style="background:${k}"></button>`).join('')}<input type="color" id="klx" value="${c.kleur}"></div>
+   <h4 style="margin:16px 0 6px">Bedragen in deze categorie <span class="k" id="som"></span></h4><div id="rijen"></div>
+   <button type="button" class="b sec" id="nr" style="margin-top:6px">+ Bedrag toevoegen</button>
+   <div class="acts">${id?'<button class="b red l" id="del">Categorie verwijderen</button>':''}<button class="b sec" id="cn">Annuleren</button><button class="b" id="ok">Opslaan</button></div>`,true);
+  const teken=()=>{
+    $('#cpre',m).style.background=st.kleur;$('#cpre',m).textContent=st.icoon;
+    $$('#ic button',m).forEach(b=>b.classList.toggle('on',b.dataset.v===st.icoon));$$('#kl button',m).forEach(b=>b.classList.toggle('on',b.dataset.v===st.kleur));
+    $('#som',m).textContent='· totaal '+eur(st.rijen.filter(r=>r.actief!==0).reduce((a,r)=>a+(+r.waarde||0),0));};
+  const lijst=()=>{$('#rijen',m).innerHTML=st.rijen.length?st.rijen.map((r,i)=>`<div style="display:flex;gap:6px;margin:4px 0;align-items:center"><input data-i="${i}" data-k="naam" value="${esc(r.naam||'')}" placeholder="Omschrijving (bijv. ETF, Bitcoin)" style="flex:2"><input data-i="${i}" data-k="waarde" type="number" step="0.01" min="0" value="${r.waarde??''}" placeholder="€" style="flex:1"><button type="button" class="b sec" data-x="${i}" title="Verwijderen">✕</button></div>`).join(''):'<div class="k">Nog geen bedragen.</div>';
+    $$('#rijen input',m).forEach(inp=>inp.oninput=()=>{st.rijen[+inp.dataset.i][inp.dataset.k]=inp.dataset.k==='waarde'?parseFloat(inp.value)||0:inp.value;teken()});
+    $$('#rijen [data-x]',m).forEach(b=>b.onclick=()=>{const r=st.rijen.splice(+b.dataset.x,1)[0];if(r.id)st.weg.push(r.id);lijst();teken()})};
+  $$('#ic button',m).forEach(b=>b.onclick=()=>{st.icoon=b.dataset.v;teken()});$('#icx',m).oninput=e=>{if(e.target.value.trim()){st.icoon=e.target.value.trim();teken()}};
+  $$('#kl button',m).forEach(b=>b.onclick=()=>{st.kleur=b.dataset.v;$('#klx',m).value=b.dataset.v;teken()});$('#klx',m).oninput=e=>{st.kleur=e.target.value;teken()};
+  $('#nr',m).onclick=()=>{st.rijen.push({naam:'',waarde:0,actief:1});lijst();teken();const l=$$('#rijen input',m);l[l.length-2].focus()};
+  $('#cn',m).onclick=m.close;lijst();teken();
+  $('#ok',m).onclick=async()=>{const naam=$('#cn_',m).value.trim();if(!naam)return toast('Vul een naam in');
+    try{const d={naam,soort:c.soort,icoon:st.icoon,kleur:st.kleur};
+      if(id)await api('PUT','prive/cat/'+id,d);else await api('POST','prive/cat',d);
+      for(const wid of st.weg)await api('DELETE','prive/bezit/'+wid);
+      for(const r of st.rijen){const oud=r.id&&cache.pbezit.find(x=>x.id===r.id);
+        if(!r.id){if((r.naam||'').trim()||r.waarde)await api('POST','prive/bezit',{naam:r.naam||naam,soort:c.soort,categorie:naam,waarde:r.waarde||0})}
+        else if(oud.naam!==r.naam||oud.waarde!==(+r.waarde||0))await api('PUT','prive/bezit/'+r.id,{naam:r.naam,waarde:+r.waarde||0})}
+      m.close();privevermogen()}catch(e){toast(e.message||'Opslaan mislukt')}};
+  if(id)$('#del',m).onclick=async()=>{if(rijen.length||st.rijen.length)return toast('Verwijder eerst de bedragen in deze categorie');if(!confirm('Categorie verwijderen?'))return;await api('DELETE','prive/cat/'+id);m.close();privevermogen()};
 }
 
 /* prognose */

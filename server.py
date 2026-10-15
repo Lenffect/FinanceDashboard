@@ -63,6 +63,15 @@ CREATE TABLE IF NOT EXISTS prive_vast(
   id INTEGER PRIMARY KEY AUTOINCREMENT, naam TEXT NOT NULL, soort TEXT DEFAULT 'uitgave',
   bedrag REAL DEFAULT 0, interval TEXT DEFAULT 'maandelijks', categorie TEXT DEFAULT '',
   actief INTEGER DEFAULT 1, notitie TEXT DEFAULT '');
+CREATE TABLE IF NOT EXISTS prive_bezit(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, naam TEXT NOT NULL, soort TEXT DEFAULT 'bezit',
+  categorie TEXT DEFAULT '', waarde REAL DEFAULT 0, actief INTEGER DEFAULT 1, notitie TEXT DEFAULT '');
+CREATE TABLE IF NOT EXISTS prive_bezit_hist(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, bezit_id INTEGER NOT NULL, datum TEXT NOT NULL, waarde REAL DEFAULT 0);
+CREATE TABLE IF NOT EXISTS prive_cat(
+  id INTEGER PRIMARY KEY AUTOINCREMENT, naam TEXT NOT NULL, soort TEXT DEFAULT 'bezit',
+  icoon TEXT DEFAULT '📦', kleur TEXT DEFAULT '#787774');
+CREATE INDEX IF NOT EXISTS ix_bezit_hist ON prive_bezit_hist(bezit_id, datum);
 """
 
 DEFAULTS = {
@@ -85,6 +94,13 @@ REL_FIELDS = ['naam', 'soort', 'adres', 'postcode_plaats', 'kvk', 'btw_nr', 'ema
 OPD_FIELDS = ['naam', 'klant', 'type', 'uurtarief', 'vast_bedrag', 'actief', 'notitie']
 UREN_FIELDS = ['opdracht_id', 'datum', 'uren', 'omschrijving']
 PMUT_FIELDS = ['datum', 'soort', 'bedrag', 'categorie', 'omschrijving', 'rekening', 'ext_id', 'intern', 'tegenpartij', 'saldo_na']
+PCAT_FIELDS = ['naam', 'soort', 'icoon', 'kleur']
+PCAT_STANDAARD = [('Spaargeld', 'bezit', '🏦', '#0f7b6c'), ('Beleggingen', 'bezit', '📈', '#2383e2'), ('Crypto', 'bezit', '🪙', '#cb912f'),
+                  ('Pensioen', 'bezit', '🌴', '#9065b0'), ('Vastgoed', 'bezit', '🏠', '#d9730d'), ('Voertuig', 'bezit', '🚗', '#6b6b6b'),
+                  ('Elektronica', 'bezit', '💻', '#529cca'), ('Bedrijf (Lenffect)', 'bezit', '🏢', '#448361'), ('Overig', 'bezit', '📦', '#9b9a97'),
+                  ('Hypotheek', 'schuld', '🏠', '#c4554d'), ('Studieschuld', 'schuld', '🎓', '#d9730d'), ('Lening', 'schuld', '💳', '#e03e3e'),
+                  ('Overig', 'schuld', '📦', '#9b9a97')]
+PBEZIT_FIELDS = ['naam', 'soort', 'categorie', 'waarde', 'actief', 'notitie']
 PVAST_FIELDS = ['naam', 'soort', 'bedrag', 'interval', 'categorie', 'actief', 'notitie']
 PRIVE_SOORTEN = ('prive_uitgave', 'storting', 'btw_betaling', 'overboeking', 'overige_baten', 'btw_teruggave')
 JPPW = 'JPPW-factuur'
@@ -247,6 +263,59 @@ def prive_saldos():
                  (r['rekening'],), one=True)
         out.append({'rekening': r['rekening'], 'datum': r['datum'], 'saldo': last['saldo_na']})
     return out
+
+
+def clean_bezit(d):
+    naam = (d.get('naam') or '').strip()
+    if not naam:
+        raise ValueError('Vul een naam in')
+    return {'naam': naam, 'soort': 'schuld' if d.get('soort') == 'schuld' else 'bezit',
+            'categorie': (d.get('categorie') or '').strip() or 'Overig', 'waarde': r2(abs(float(d.get('waarde') or 0))),
+            'actief': 0 if d.get('actief') in (0, False, '0') else 1, 'notitie': (d.get('notitie') or '').strip()}
+
+
+def bezit_effectief(u):
+    """Bijdrage aan het vermogen: schuld negatief, niet-actief (verkocht/afgelost) is 0."""
+    return 0 if not u['actief'] else (u['waarde'] if u['soort'] == 'bezit' else -u['waarde'])
+
+
+def bezit_hist_zet(c, bezit_id, waarde, datum=None):
+    """Legt de waarde van vandaag vast (één punt per dag) voor de trendgrafiek."""
+    datum = datum or dt.date.today().isoformat()
+    c.execute('DELETE FROM prive_bezit_hist WHERE bezit_id=? AND datum=?', (bezit_id, datum))
+    c.execute('INSERT INTO prive_bezit_hist(bezit_id,datum,waarde) VALUES(?,?,?)', (bezit_id, datum, waarde))
+
+
+def clean_cat(d):
+    naam = (d.get('naam') or '').strip()
+    if not naam:
+        raise ValueError('Vul een naam in')
+    kleur = d.get('kleur') or '#787774'
+    if not re.match(r'^#[0-9a-fA-F]{6}$', kleur):
+        raise ValueError('Ongeldige kleur')
+    return {'naam': naam, 'soort': 'schuld' if d.get('soort') == 'schuld' else 'bezit',
+            'icoon': (d.get('icoon') or '📦').strip()[:8], 'kleur': kleur}
+
+
+def prive_vermogen():
+    """Bezittingen/schulden + bankrekeningen (uit saldo_na) en hun historie voor de net-worth-trend."""
+    bank_hist = {}
+    for r in q("SELECT rekening, datum, saldo_na FROM prive_mutaties WHERE rekening<>'' AND saldo_na IS NOT NULL ORDER BY datum, id"):
+        bank_hist.setdefault(r['rekening'], {})[r['datum']] = r['saldo_na']  # laatste saldo van de dag wint
+    with closing(db()) as c:
+        if not c.execute('SELECT 1 FROM prive_cat').fetchone():
+            c.executemany('INSERT INTO prive_cat(naam,soort,icoon,kleur) VALUES(?,?,?,?)', PCAT_STANDAARD)
+        # categorieën van bestaande bedragen die nog niet als categorie bestaan, alsnog aanmaken
+        for r in c.execute("SELECT DISTINCT COALESCE(NULLIF(categorie,''),'Overig') n, soort FROM prive_bezit").fetchall():
+            if not c.execute('SELECT 1 FROM prive_cat WHERE naam=? AND soort=?', (r[0], r[1])).fetchone():
+                c.execute('INSERT INTO prive_cat(naam,soort) VALUES(?,?)', r)
+        c.execute("UPDATE prive_bezit SET categorie='Overig' WHERE categorie=''")
+        c.commit()
+    return {'cats': q('SELECT * FROM prive_cat ORDER BY soort, id'),
+            'items': q('SELECT * FROM prive_bezit ORDER BY soort, categorie, naam COLLATE NOCASE'),
+            'hist': q('SELECT bezit_id, datum, waarde FROM prive_bezit_hist ORDER BY datum'),
+            'bank': {k: sorted(v.items()) for k, v in bank_hist.items()},
+            'saldos': prive_saldos()}
 
 
 def list_boekingen(p):
@@ -1051,6 +1120,60 @@ class H(BaseHTTPRequestHandler):
                               (cat, '%' + zoek + '%', '%' + zoek + '%')).rowcount
                 c.commit()
             return {'bijgewerkt': n}
+        if p == 'prive/vermogen' and method == 'GET':
+            return prive_vermogen()
+        if p == 'prive/cat' and method == 'POST':
+            u = clean_cat(body)
+            if q('SELECT 1 FROM prive_cat WHERE naam=? AND soort=?', (u['naam'], u['soort'])):
+                raise ValueError('Deze categorie bestaat al')
+            with closing(db()) as c:
+                u['id'] = insert(c, 'prive_cat', PCAT_FIELDS, u)
+                c.commit()
+            return u
+        m = re.match(r'^prive/cat/(\d+)$', p)
+        if m and method == 'PUT':
+            cid = int(m.group(1))
+            old = q('SELECT * FROM prive_cat WHERE id=?', (cid,), one=True) or {}
+            u = clean_cat({**old, **body, 'soort': old.get('soort', 'bezit')})
+            if q('SELECT 1 FROM prive_cat WHERE naam=? AND soort=? AND id<>?', (u['naam'], u['soort'], cid)):
+                raise ValueError('Deze categorie bestaat al')
+            with closing(db()) as c:
+                update(c, 'prive_cat', PCAT_FIELDS, u, cid)
+                if old and old['naam'] != u['naam']:
+                    c.execute('UPDATE prive_bezit SET categorie=? WHERE categorie=? AND soort=?', (u['naam'], old['naam'], u['soort']))
+                c.commit()
+            return u
+        if m and method == 'DELETE':
+            cid = int(m.group(1))
+            old = q('SELECT * FROM prive_cat WHERE id=?', (cid,), one=True)
+            if old and q('SELECT 1 FROM prive_bezit WHERE categorie=? AND soort=?', (old['naam'], old['soort'])):
+                raise ValueError('Verwijder eerst de bedragen in deze categorie')
+            with closing(db()) as c:
+                c.execute('DELETE FROM prive_cat WHERE id=?', (cid,))
+                c.commit()
+            return {'ok': True}
+        if p == 'prive/bezit' and method == 'POST':
+            u = clean_bezit(body)
+            with closing(db()) as c:
+                u['id'] = insert(c, 'prive_bezit', PBEZIT_FIELDS, u)
+                bezit_hist_zet(c, u['id'], bezit_effectief(u))
+                c.commit()
+            return u
+        m = re.match(r'^prive/bezit/(\d+)$', p)
+        if m and method == 'PUT':
+            old = q('SELECT * FROM prive_bezit WHERE id=?', (int(m.group(1)),), one=True) or {}
+            u = clean_bezit({**old, **body})
+            with closing(db()) as c:
+                update(c, 'prive_bezit', PBEZIT_FIELDS, u, int(m.group(1)))
+                bezit_hist_zet(c, int(m.group(1)), bezit_effectief(u))
+                c.commit()
+            return u
+        if m and method == 'DELETE':
+            with closing(db()) as c:
+                c.execute('DELETE FROM prive_bezit_hist WHERE bezit_id=?', (int(m.group(1)),))
+                c.execute('DELETE FROM prive_bezit WHERE id=?', (int(m.group(1)),))
+                c.commit()
+            return {'ok': True}
         m = re.match(r'^prive/mutaties/(\d+)$', p)
         if m and method == 'PUT':
             old = q('SELECT * FROM prive_mutaties WHERE id=?', (int(m.group(1)),), one=True) or {}
