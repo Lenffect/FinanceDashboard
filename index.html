@@ -2,7 +2,11 @@
 <html lang="nl">
 <head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Finance">
+<meta name="theme-color" content="#191919" media="(prefers-color-scheme:dark)"><meta name="theme-color" content="#ffffff" media="(prefers-color-scheme:light)">
 <title>Lennar Finance</title>
 <style>
 :root{--bg:#fff;--side:#f7f7f5;--card:#fff;--tx:#37352f;--mut:#787774;--line:#e9e9e7;--hover:rgba(55,53,47,.06);--acc:#0f7b6c;--accbg:#ddedea;--warn:#cb912f;--warnbg:#fbf3db;--bad:#e03e3e;--badbg:#fbe4e4;--blue:#2383e2;--bluebg:#e7f3f8;--shadow:none}
@@ -21,7 +25,7 @@ main{flex:1;min-width:0;max-width:1120px;margin:0 auto;padding:34px 40px 100px}
 h1{font-size:26px;font-weight:700;letter-spacing:-.4px;margin:0}h2{font-size:15px;font-weight:600;margin:28px 0 10px}
 .bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:16px}.bar .sp{flex:1}
 .card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px}
-.grid{display:grid;gap:14px}.g4{grid-template-columns:repeat(auto-fit,minmax(230px,1fr))}.g2{grid-template-columns:repeat(auto-fit,minmax(340px,1fr))}
+.grid{display:grid;gap:14px}.g4{grid-template-columns:repeat(auto-fit,minmax(min(230px,100%),1fr))}.g2{grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr))}
 .k{color:var(--mut);font-size:12px}.big{font-size:22px;font-weight:700;letter-spacing:-.3px}
 .row{display:flex;justify-content:space-between;gap:10px;padding:3px 0}
 button.b,a.b{background:var(--blue);color:#fff;border:0;border-radius:6px;padding:6px 12px;font:500 13px inherit;cursor:pointer;text-decoration:none;display:inline-block}
@@ -61,9 +65,27 @@ h3{font-size:14px;margin:18px 0 6px}
 .leg{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:12px;color:var(--mut)}.leg b{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}
 .quick{display:grid;grid-template-columns:130px 1.3fr 90px 2fr auto;gap:8px;align-items:end;margin:14px 0 6px}
 .seg{display:flex;background:var(--hover);border-radius:8px;padding:2px;margin:0 4px 6px}.seg button{flex:1;justify-content:center!important;text-align:center!important;border-radius:6px!important;font-weight:500}.seg button.on{background:var(--card)!important;box-shadow:0 1px 2px rgba(0,0,0,.12);font-weight:600}.dot{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:8px}.quick input,.quick select{height:34px}.dag td{background:var(--side);font-size:12px;font-weight:600;color:var(--mut)}
-@media(max-width:1000px){.rv{grid-template-columns:1fr}.pv{position:static}}
-@media(max-width:800px){.shell{flex-direction:column}aside{width:auto;height:auto;position:static;border-right:0;border-bottom:1px solid var(--line)}nav{flex-direction:row;flex-wrap:wrap}nav h6{display:none}main{padding:20px 16px 80px}.quick{grid-template-columns:1fr 1fr}}
+#mb{display:none;margin-left:auto;background:none;border:1px solid var(--line);color:var(--tx);border-radius:8px;width:40px;height:36px;font-size:18px;cursor:pointer}
+@media(max-width:1000px){.rv{grid-template-columns:1fr}.pv{position:static}main{padding:28px 24px 90px}}
+@media(max-width:800px){
+ .shell{flex-direction:column}
+ aside{width:auto;height:auto;position:sticky;top:0;z-index:15;border-right:0;border-bottom:1px solid var(--line);padding:8px 12px;padding-top:max(8px,env(safe-area-inset-top));max-height:100vh;overflow:auto}
+ .brand{padding:2px 0}#mb{display:block}
+ nav{display:none;flex-direction:column;padding:6px 0 10px}body.menu nav{display:flex}nav h6{display:block}
+ nav button{padding:11px 10px;font-size:15px}.seg button{padding:10px!important}
+ main{padding:18px max(14px,env(safe-area-inset-left)) 80px max(14px,env(safe-area-inset-right))}
+ h1{font-size:22px}.quick{grid-template-columns:1fr 1fr}
+ main table{display:block;overflow-x:auto;-webkit-overflow-scrolling:touch}
+ input,select,textarea{font-size:16px;min-height:40px}input[type=checkbox]{min-height:0}
+ button.b,a.b{padding:9px 14px;font-size:14px}.chip{padding:7px 12px}
+ .ov{padding:0;align-items:stretch}.md,.md.wide,.md.xl{max-width:none;border-radius:0;min-height:100%;padding:16px 14px calc(16px + env(safe-area-inset-bottom))}
+ .acts{flex-wrap:wrap}.acts .l{margin-right:0;width:100%}
+ .tm{height:min(var(--h,320px),70vw)!important;min-height:220px}
+ .bar .sp{display:none}
+}
 @media(max-width:700px){.fg{grid-template-columns:1fr 1fr}.fg>*{grid-column:span 2!important}.regel{grid-template-columns:1fr 1fr}.hide-m{display:none}}
+@media(max-width:480px){.quick{grid-template-columns:1fr}.big{font-size:20px}.stat .big{font-size:21px}.card{padding:12px}.toast{width:calc(100% - 28px);text-align:center}}
+@media(hover:none){tbody tr.klik:hover td{background:none}.tmb>div:hover{filter:none}}
 @media print{aside,header,.bar,.noprint,.toast{display:none!important}body{background:#fff}main{padding:0}.card,table{box-shadow:none}}
 
 .tm{position:relative;border-radius:12px;overflow:hidden}.tmb{position:absolute;padding:2px;box-sizing:border-box}
@@ -77,7 +99,7 @@ h3{font-size:14px;margin:18px 0 6px}
 </style>
 </head>
 <body>
-<div class="shell"><aside><div class="brand"><i>L</i>Lennar Finance</div><nav id="nav"></nav></aside>
+<div class="shell"><aside><div class="brand"><i>L</i>Lennar Finance<button id="mb" type="button" aria-label="Menu" aria-expanded="false">☰</button></div><nav id="nav"></nav></aside>
 <main id="main"></main></div>
 <script>
 const $=(s,e=document)=>e.querySelector(s), $$=(s,e=document)=>[...e.querySelectorAll(s)];
@@ -137,7 +159,8 @@ function nav(){
    groepen().map(([g,l])=>[g,l.filter(([k])=>!vb.includes(k)||k===state.page)]).filter(([,l])=>l.length).map(([g,l])=>`<h6>${g}</h6>`+l.map(([k,t])=>`<button class="${state.page===k?'on':''}" data-p="${k}">${t}${k==='inbox'&&state.inboxN?` <span class="tag flag">${state.inboxN}</span>`:''}</button>`).join('')).join('');
   $$('#nav button[data-p]').forEach(b=>b.onclick=()=>go(b.dataset.p));
 }
-async function go(p){if(p==='dashboard'&&modus()==='prive')p='priveov';if(p==='priveov'&&modus()!=='prive')state.modus='prive';state.page=p;nav();$('#main').innerHTML='<p class="mut">Laden…</p>';window.scrollTo(0,0);
+$('#mb').onclick=()=>{const o=document.body.classList.toggle('menu');$('#mb').setAttribute('aria-expanded',o)};
+async function go(p){document.body.classList.remove('menu');if(p==='dashboard'&&modus()==='prive')p='priveov';if(p==='priveov'&&modus()!=='prive')state.modus='prive';state.page=p;nav();$('#main').innerHTML='<p class="mut">Laden…</p>';window.scrollTo(0,0);
   state.relaties=await api('GET','relaties');state.instellingen=await api('GET','instellingen');if(!state.modus){state.modus=state.instellingen.modus||'zakelijk';if(p==='dashboard'&&state.modus==='prive'){p='priveov';state.page=p}nav()}
   const ib=await api('GET','inbox');state.inboxN=ib.bestanden.length+ib.concepten.length;nav();
   await ({dashboard,inbox,bank,boekingen,btw,verrekening,facturen,abonnementen,relaties,instellingen,uren,prijs,priveov,privevermogen,privemut,privevast,priveprog,privecat}[p])();}
@@ -802,7 +825,7 @@ function blokken(l,totaal,hoogte,leeg){
   const items=l.filter(i=>i.bedrag>0).sort((a,b)=>b.bedrag-a.bedrag);
   if(!items.length)return `<div class="note info">${leeg}</div>`;
   const out=[];treemap(items,0,0,100,100,out);
-  return `<div class="tm" style="height:${hoogte}px">${out.map(r=>`<div class="tmb" style="left:${r.x}%;top:${r.y}%;width:${r.bw}%;height:${r.bh}%"><div ${r.id?`onclick="editCat(${r.id})"`:''} style="background:${r.kleur};${r.id?'cursor:pointer':''}" title="${esc(r.naam)}: ${eur(r.bedrag)}"><span class="ti">${r.icoon}</span><b class="tn">${esc(r.naam)}</b><span class="tv">${eur(r.bedrag)}</span><span class="tp">${totaal?Math.round(r.bedrag/totaal*100):0}%</span></div></div>`).join('')}</div>`;
+  return `<div class="tm" style="--h:${hoogte}px;height:var(--h)">${out.map(r=>`<div class="tmb" style="left:${r.x}%;top:${r.y}%;width:${r.bw}%;height:${r.bh}%"><div ${r.id?`onclick="editCat(${r.id})"`:''} style="background:${r.kleur};${r.id?'cursor:pointer':''}" title="${esc(r.naam)}: ${eur(r.bedrag)}"><span class="ti">${r.icoon}</span><b class="tn">${esc(r.naam)}</b><span class="tv">${eur(r.bedrag)}</span><span class="tp">${totaal?Math.round(r.bedrag/totaal*100):0}%</span></div></div>`).join('')}</div>`;
 }
 async function privevermogen(){
   const v=await api('GET','prive/vermogen');cache.pbezit=v.items;cache.pcats=v.cats;
