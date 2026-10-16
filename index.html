@@ -889,7 +889,7 @@ function editCat(id,soort){
 }
 
 /* prognose */
-const PP0={start:0,opname:2500,extra_uit:0,schommel:0,maanden:12,variabel:null};
+const PP0={start:0,opname:2500,extra_uit:0,schommel:0,maanden:12,variabel:null,opname_laag:null,opname_hoog:null,baan:0,baan_modus:'netto',baan_inhouding:30,baan_start:0};
 function ppLaad(){let m={};try{m=JSON.parse(state.instellingen.prive_prognose||'{}')}catch(e){}return {...PP0,...m}}
 let _ppT;function ppBewaar(m){clearTimeout(_ppT);_ppT=setTimeout(async()=>{state.instellingen.prive_prognose=JSON.stringify(m);await api('PUT','instellingen',{prive_prognose:state.instellingen.prive_prognose})},600)}
 async function priveprog(){
@@ -901,39 +901,59 @@ async function priveprog(){
   const alleJr=[...vorig.mut,...vorig.wise,...d.mut,...d.wise].filter(x=>x.soort==='uitgave'&&mk.some(k=>x.datum.startsWith(k)));
   const gemVar=alleJr.reduce((a,x)=>a+x.bedrag,0)/3;
   const vastU=d.vast.filter(v=>v.actief&&v.soort==='uitgave').reduce((a,v)=>a+perMaand(v),0),vastI=d.vast.filter(v=>v.actief&&v.soort==='inkomen').reduce((a,v)=>a+perMaand(v),0);
-  const m=ppLaad();if(m.variabel==null)m.variabel=Math.round(gemVar);
+  const m=ppLaad();if(m.variabel==null)m.variabel=Math.round(gemVar);if(m.opname_laag==null)m.opname_laag=Math.round(m.opname*0.6);if(m.opname_hoog==null)m.opname_hoog=Math.round(m.opname*1.4);
   $('#main').innerHTML=`<div class="bar"><h1>Privé · Prognose</h1></div>
   <p class="k" style="margin-top:-8px">Hoeveel blijft er over de komende maanden? Pas aan en je ziet direct het effect. Je kunt rekenen in de vakken. Wijzigingen worden bewaard.</p>
   <div class="rv" style="grid-template-columns:minmax(0,320px) minmax(0,1fr)"><div class="card" id="ppin">
    <label class="f" style="display:block;margin-bottom:8px"><span>Huidig privé-saldo (€)</span><input type="number" step="any" name="start"></label>
    <label class="f" style="display:block;margin-bottom:8px"><span>Opname uit de zaak per maand (€)</span><input type="number" step="any" name="opname"></label>
+   <label class="f" style="display:block;margin-bottom:8px"><span>Opname laag (€) <span class="k">slecht scenario</span></span><input type="number" step="any" name="opname_laag"></label>
+   <label class="f" style="display:block;margin-bottom:8px"><span>Opname hoog (€) <span class="k">goed scenario</span></span><input type="number" step="any" name="opname_hoog"></label>
+   <label class="f" style="display:block;margin-bottom:8px"><span>Stabiel inkomen uit baan per maand (€) <span class="k">part-time of full-time, 0 = geen</span></span><div style="display:flex;gap:6px"><input type="number" step="any" name="baan" style="flex:1;min-width:0"><select name="baan_modus"><option value="netto">Netto</option><option value="bruto">Bruto</option></select></div></label>
+   <label class="f" style="display:block;margin-bottom:8px"><span>Inhoudingen bij bruto (%) <span class="k">belasting + premies, schatting</span></span><input type="number" step="any" name="baan_inhouding"></label>
+   <label class="f" style="display:block;margin-bottom:8px"><span>Baan start na (maanden) <span class="k">0 = nu al</span></span><input type="number" step="1" min="0" name="baan_start"></label>
    <label class="f" style="display:block;margin-bottom:8px"><span>Variabele uitgaven per maand (€) <span class="k">gemiddelde laatste 3 mnd: ${eur(gemVar)}</span></span><input type="number" step="any" name="variabel"></label>
    <label class="f" style="display:block;margin-bottom:8px"><span>Extra uitgaven per maand (€) <span class="k">bijv. nieuwe lening</span></span><input type="number" step="any" name="extra_uit"></label>
    <label class="f" style="display:block;margin-bottom:8px"><span>Schommeling opname (%) <span class="k">−30 = slechte maanden</span></span><input type="number" step="any" name="schommel"></label>
    <label class="f" style="display:block"><span>Aantal maanden vooruit</span><input type="number" step="1" name="maanden"></label>
    <div class="k" style="margin-top:10px">Vaste lasten (${eur(vastU)}) en vast inkomen (${eur(vastI)}) komen uit het tabblad Vaste lasten.</div></div><div id="ppout"></div></div>`;
   const f=$('#ppin');setv(f,m);
-  const upd=()=>{const x={};['start','opname','variabel','extra_uit','schommel','maanden'].forEach(k=>x[k]=parseFloat(val(f,k))||0);x.maanden=Math.min(36,Math.max(1,Math.round(x.maanden)||12));ppBewaar(x);ppToon(x,vastU,vastI)};
+  const upd=()=>{const x={};['start','opname','opname_laag','opname_hoog','baan','baan_start','variabel','extra_uit','schommel','maanden'].forEach(k=>x[k]=parseFloat(val(f,k))||0);x.baan_start=Math.max(0,Math.round(x.baan_start));x.baan_modus=val(f,'baan_modus')==='bruto'?'bruto':'netto';x.maanden=Math.min(36,Math.max(1,Math.round(x.maanden)||12));ppBewaar(x);ppToon(x,vastU,vastI)};
   f.addEventListener('input',upd);ppToon(m,vastU,vastI);
 }
 function ppToon(m,vastU,vastI){
-  const inkM=(m.opname*(1+m.schommel/100)+vastI),uitM=vastU+m.variabel+m.extra_uit,nettoM=inkM-uitM;
-  let s=m.start;const rij=[];const nu=new Date();
-  for(let i=0;i<m.maanden;i++){s+=nettoM;const dd=new Date(nu.getFullYear(),nu.getMonth()+i+1,1);rij.push({n:dd.toLocaleDateString('nl-NL',{month:'short',year:'2-digit'}),saldo:s})}
-  const lo=Math.min(m.start,...rij.map(r=>r.saldo)),hi=Math.max(m.start,...rij.map(r=>r.saldo)),span=(hi-lo)||1;
-  const W=560,H=140,x=i=>20+i*(W-40)/Math.max(1,rij.length-1),y=v=>H-14-(v-lo)/span*(H-34);
+  const inh=Math.min(99,Math.max(0,m.baan_inhouding))/100,bruto=m.baan_modus==='bruto';
+  const baanNetto=bruto?m.baan*(1-inh):m.baan,baanBruto=bruto?m.baan:(inh<1?m.baan/(1-inh):0);m={...m,baan:baanNetto};
+  const uitM=vastU+m.variabel+m.extra_uit,f=1+m.schommel/100;
+  const inkIn=(op,i)=>op*f+vastI+(i>=m.baan_start?m.baan:0);
+  const sc={laag:m.opname_laag,mid:m.opname,hoog:m.opname_hoog};
+  const reeks={};const nu=new Date();const namen=[];
+  for(const k in sc){let s=m.start;reeks[k]=[];for(let i=0;i<m.maanden;i++){s+=inkIn(sc[k],i)-uitM;reeks[k].push(s)}}
+  for(let i=0;i<m.maanden;i++)namen.push(new Date(nu.getFullYear(),nu.getMonth()+i+1,1).toLocaleDateString('nl-NL',{month:'short',year:'2-digit'}));
+  const rij=namen.map((n,i)=>({n,laag:reeks.laag[i],saldo:reeks.mid[i],hoog:reeks.hoog[i],ink:inkIn(m.opname,i)}));
+  const alleW=[m.start,...rij.flatMap(r=>[r.laag,r.saldo,r.hoog])];
+  const lo=Math.min(...alleW),hi=Math.max(...alleW),span=(hi-lo)||1;
+  const W=560,H=160,x=i=>20+i*(W-40)/Math.max(1,rij.length-1),y=v=>H-14-(v-lo)/span*(H-34);
   const nul=lo<0&&hi>0?`<line x1="20" x2="${W-20}" y1="${y(0)}" y2="${y(0)}" stroke="var(--line)" stroke-dasharray="4"/>`:'';
-  const pts=rij.map((r,i)=>`${x(i)},${y(r.saldo)}`).join(' ');
-  const maandenBuffer=uitM>0?m.start/uitM:0,neg=rij.find(r=>r.saldo<0);
+  const lijn=k=>rij.map((r,i)=>`${x(i)},${y(r[k])}`).join(' ');
+  const band=rij.map((r,i)=>`${x(i)},${y(r.hoog)}`).join(' ')+' '+rij.map((r,i)=>`${x(rij.length-1-i)},${y(rij[rij.length-1-i].laag)}`).join(' ');
+  const inkM=rij[rij.length-1].ink,nettoM=inkM-uitM,nettoL=inkIn(sc.laag,m.maanden)-uitM,nettoH=inkIn(sc.hoog,m.maanden)-uitM;
+  const maandenBuffer=uitM>0?m.start/uitM:0,neg=rij.find(r=>r.saldo<0),negL=rij.find(r=>r.laag<0);
+  const baanTxt=m.baan>0?` Inclusief baan van ${eur(baanNetto)} netto (${eur(baanBruto)} bruto) per maand${m.baan_start>0?` vanaf over ${m.baan_start} mnd`:''}.`:'';
   $('#ppout').innerHTML=`<div class="grid g4" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
-   <div class="card stat"><div class="k">Inkomen per maand</div><div class="big pos">${eur(inkM)}</div></div>
+   <div class="card stat"><div class="k">Inkomen per maand</div><div class="big pos">${eur(inkM)}</div>${m.baan>0?`<div class="k">waarvan baan ${eur(baanNetto)} netto (${eur(baanBruto)} bruto)</div>`:''}</div>
    <div class="card stat"><div class="k">Uitgaven per maand</div><div class="big">${eur(uitM)}</div></div>
-   <div class="card stat"><div class="k">Houdt over per maand</div><div class="big ${nettoM<0?'neg':'pos'}">${eur(nettoM)}</div></div>
+   <div class="card stat"><div class="k">Houdt over per maand</div><div class="big ${nettoM<0?'neg':'pos'}">${eur(nettoM)}</div><div class="k">range ${eur(nettoL)} t/m ${eur(nettoH)}</div></div>
    <div class="card stat"><div class="k">Buffer nu</div><div class="big">${maandenBuffer.toFixed(1).replace('.',',')} mnd</div><div class="k">van je uitgaven</div></div></div>
-  ${neg?`<div class="note" style="margin-top:14px">Bij deze aannames komt je privé-saldo onder nul in ${esc(neg.n)}.</div>`:`<div class="note ok" style="margin-top:14px">Je saldo blijft positief de komende ${m.maanden} maanden.</div>`}
-  <h2>Saldo-verloop</h2><div class="card"><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${nul}<polyline points="${pts}" fill="none" stroke="var(--blue)" stroke-width="2.5"/>${rij.map((r,i)=>`<circle cx="${x(i)}" cy="${y(r.saldo)}" r="3" fill="${r.saldo<0?'var(--bad)':'var(--blue)'}"/>`).join('')}
-   ${rij.filter((_,i)=>i%Math.ceil(rij.length/8)===0||i===rij.length-1).map(r=>`<text x="${x(rij.indexOf(r))}" y="${H-1}" font-size="10" text-anchor="middle" fill="var(--mut)">${r.n}</text>`).join('')}</svg></div>
-  <table style="margin-top:14px"><thead><tr><th>Maand</th><th class="num">Inkomen</th><th class="num">Uitgaven</th><th class="num">Saldo einde maand</th></tr></thead><tbody>${rij.map(r=>`<tr><td>${r.n}</td><td class="num">${eur(inkM)}</td><td class="num">${eur(uitM)}</td><td class="num ${r.saldo<0?'neg':''}"><b>${eur(r.saldo)}</b></td></tr>`).join('')}</tbody></table>`;
+  ${neg?`<div class="note" style="margin-top:14px">Verwacht scenario: saldo onder nul in ${esc(neg.n)}.${baanTxt}</div>`
+    :negL?`<div class="note" style="margin-top:14px">Verwacht blijft positief, maar in het lage scenario ga je onder nul in ${esc(negL.n)}.${baanTxt}</div>`
+    :`<div class="note ok" style="margin-top:14px">Saldo blijft positief de komende ${m.maanden} maanden, ook in het lage scenario.${baanTxt}</div>`}
+  <h2>Saldo-verloop</h2><div class="card"><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${nul}<polygon points="${band}" fill="var(--blue)" opacity=".15"/>
+   <polyline points="${lijn('hoog')}" fill="none" stroke="var(--blue)" stroke-width="1.2" stroke-dasharray="4 3"/><polyline points="${lijn('laag')}" fill="none" stroke="var(--blue)" stroke-width="1.2" stroke-dasharray="4 3"/>
+   <polyline points="${lijn('saldo')}" fill="none" stroke="var(--blue)" stroke-width="2.5"/>${rij.map((r,i)=>`<circle cx="${x(i)}" cy="${y(r.saldo)}" r="3" fill="${r.saldo<0?'var(--bad)':'var(--blue)'}"/>`).join('')}
+   ${rij.filter((_,i)=>i%Math.ceil(rij.length/8)===0||i===rij.length-1).map(r=>`<text x="${x(rij.indexOf(r))}" y="${H-1}" font-size="10" text-anchor="middle" fill="var(--mut)">${r.n}</text>`).join('')}</svg>
+   <div class="k">Lijn = verwacht, gearceerd gebied = bereik tussen laag (${eur(m.opname_laag)}) en hoog (${eur(m.opname_hoog)}) opname.</div></div>
+  <table style="margin-top:14px"><thead><tr><th>Maand</th><th class="num">Inkomen</th><th class="num">Uitgaven</th><th class="num">Laag</th><th class="num">Verwacht</th><th class="num">Hoog</th></tr></thead><tbody>${rij.map(r=>`<tr><td>${r.n}</td><td class="num">${eur(r.ink)}</td><td class="num">${eur(uitM)}</td><td class="num ${r.laag<0?'neg':''}">${eur(r.laag)}</td><td class="num ${r.saldo<0?'neg':''}"><b>${eur(r.saldo)}</b></td><td class="num ${r.hoog<0?'neg':''}">${eur(r.hoog)}</td></tr>`).join('')}</tbody></table>`;
 }
 
 /* ------------------------------------------------ relaties */
