@@ -253,12 +253,12 @@ async function inbox(){
   const d=await api('GET','inbox');cache.inbox=d;
   $('#main').innerHTML=`<div class="bar"><h1>Inbox</h1></div>
   <div class="drop" id="dz"><b>Sleep facturen hierheen</b> <span class="mut">of klik om te kiezen (pdf, jpg, png)</span>
-   <div class="k" style="margin-top:6px">Je kunt bestanden ook rechtstreeks in de map <code>inbox</code> naast dit programma zetten. Zeg daarna tegen Claude: "verwerk de inbox". Die maakt er concepten van die jij hier controleert.</div>
+   <div class="k" style="margin-top:6px">Je kunt bestanden ook rechtstreeks in de map <code>inbox</code> naast dit programma zetten. Zeg daarna tegen Claude: "verwerk de inbox". Die maakt er concepten van die jij hier controleert. Een btw-aangifte? Klik bij het bestand op "Btw-aangifte": die wordt bewaard in <code>btw/jaar/kwartaal</code>.</div>
    <input type="file" id="fi" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.heic" hidden></div>
   <h2>Concepten om te controleren (${d.concepten.length})</h2>
   ${d.concepten.length?`<table><thead><tr><th>Datum</th><th>Omschrijving</th><th class="num">Excl.</th><th class="num">Btw</th><th>Btw-soort</th><th>Van wie</th><th></th></tr></thead><tbody>${d.concepten.map(b=>`<tr class="klik" onclick="editBoeking(${b.id})"><td>${dat(b.datum)}</td><td>${esc(b.omschrijving)}<div class="k">${esc(b.relatie)}${b.bijlage?' · 📎 '+esc(b.bijlage.split('/').pop()):''}</div></td><td class="num">${eur(b.bedrag_excl)}</td><td class="num">${eur(b.btw_bedrag)}</td><td class="sm">${BTWS[b.btw_soort]}</td><td>${tag(b)}</td><td>${b.mogelijk_dubbel.length?'<span class="tag bad">mogelijk dubbel</span>':''} ${b.controleren?'<span class="tag flag">controleren</span>':''}</td></tr>`).join('')}</tbody></table><p class="k">Klik een concept open: links zie je de factuur, rechts de ingevulde gegevens. Pas aan wat niet klopt en klik op Goedkeuren. Pas dan telt hij mee in je btw en overzicht.</p>`:'<div class="note ok">Geen concepten die op controle wachten.</div>'}
   <h2>Nog te verwerken bestanden (${d.bestanden.length})</h2>
-  ${d.bestanden.length?`<table><thead><tr><th>Bestand</th><th>Toegevoegd</th><th class="num">Grootte</th><th></th></tr></thead><tbody>${d.bestanden.map((f,i)=>`<tr><td><a href="/inbox/${encodeURIComponent(f.naam)}" target="_blank">${esc(f.naam)}</a></td><td class="sm">${f.datum}</td><td class="num sm">${Math.round(f.grootte/1024)} kB</td><td class="num"><button class="b sec" onclick="maakUitInbox(${i})">Zelf boeking maken</button></td></tr>`).join('')}</tbody></table>`:'<div class="note info">De inbox is leeg.</div>'}`;
+  ${d.bestanden.length?`<table><thead><tr><th>Bestand</th><th>Toegevoegd</th><th class="num">Grootte</th><th></th></tr></thead><tbody>${d.bestanden.map((f,i)=>`<tr><td><a href="/inbox/${encodeURIComponent(f.naam)}" target="_blank">${esc(f.naam)}</a></td><td class="sm">${f.datum}</td><td class="num sm">${Math.round(f.grootte/1024)} kB</td><td class="num"><button class="b sec" onclick="maakUitInbox(${i})">Zelf boeking maken</button> <button class="b sec" onclick="bewaarAangifte(${i})">Btw-aangifte</button></td></tr>`).join('')}</tbody></table>`:'<div class="note info">De inbox is leeg.</div>'}`;
   const dz=$('#dz'),fi=$('#fi');
   dz.onclick=()=>fi.click();fi.onchange=()=>uploadFiles(fi.files);
   dz.ondragover=e=>{e.preventDefault();dz.classList.add('over')};dz.ondragleave=()=>dz.classList.remove('over');
@@ -268,6 +268,12 @@ async function uploadFiles(files){
   for(const f of files){const r=await fetch('/api/inbox/upload',{method:'POST',headers:{'X-Filename':encodeURIComponent(f.name)},body:f});
     if(!r.ok){toast((await r.json()).fout||'Upload mislukt')}}
   toast('Geüpload');go('inbox');
+}
+async function bewaarAangifte(i){
+  const f=cache.inbox.bestanden[i];const m=f.naam.match(/(20\d\d)\D{0,3}Q([1-4])/i);const l=lastQ();
+  const inv=prompt('Voor welk kwartaal is deze btw-aangifte? (jaar-kwartaal, bijv. 2026-Q3)',m?`${m[1]}-Q${m[2]}`:`${l.y}-Q${l.q}`);if(!inv)return;
+  const x=inv.match(/(20\d\d)\D*Q?([1-4])/i);if(!x)return toast('Gebruik de vorm 2026-Q3');
+  const r=await api('POST','inbox/btw-aangifte',{naam:f.naam,jaar:+x[1],kwartaal:+x[2]});toast('Opgeslagen in '+r.pad);go('inbox');
 }
 function maakUitInbox(i){openBoeking({soort:'kosten',datum:today(),toewijzing:'ik',pct_ik:100,btw_soort:'nl21',rekening:'ing',betaald:1,inbox_bestand:cache.inbox.bestanden[i].naam})}
 
@@ -373,7 +379,7 @@ async function btw(){
   const rub=d.rubrieken.filter(r=>r.rubriek!=='5b');
   const r5=d.rubrieken.find(r=>r.rubriek==='5b');
   const line=r=>`<tr class="${r.regels.length?'':'mut'}"><td>${r.rubriek}</td><td>${esc(r.omschrijving)}${r.regels.length?`<details><summary>${r.regels.length} boekingen</summary><table style="margin-top:6px">${r.regels.map(x=>`<tr class="klik" onclick="editBoeking(${x.id})"><td style="width:92px">${dat(x.datum)}</td><td>${esc(x.omschrijving)}</td><td class="num">${eur(x.grondslag)}</td><td class="num">${eur(x.btw)}</td></tr>`).join('')}</table></details>`:''}</td>
-    <td class="num">${r.rubriek==='5b'?'':'€ '+r.grondslag_hele_euros.toLocaleString('nl-NL')}${r.rubriek==='5b'?'':`<div class="k">${eur(r.grondslag)}</div>`}</td><td class="num">${r.rubriek==='1e'?'':eur(r.btw)}</td></tr>`;
+    <td class="num">${r.rubriek==='5b'?'':'€ '+r.grondslag_hele_euros.toLocaleString('nl-NL')}${r.rubriek==='5b'?'':`<div class="k">${eur(r.grondslag)}</div>`}</td><td class="num">${r.rubriek==='1e'?'':'€ '+r.btw_hele_euros.toLocaleString('nl-NL')+`<div class="k">${eur(r.btw)}</div>`}</td></tr>`;
   const dl=new Date(d.deadline);const dagen=Math.ceil((dl-new Date())/864e5);
   $('#main').innerHTML=`<div class="bar"><h1>Btw-aangifte</h1><select onchange="state.btwSel.y=+this.value;btw()">${yearOpts(sel.y)}</select>
    <select onchange="state.btwSel.q=+this.value;btw()">${[1,2,3,4].map(q=>`<option value="${q}" ${q==sel.q?'selected':''}>Kwartaal ${q}</option>`).join('')}</select><span class="sp"></span>
@@ -381,14 +387,14 @@ async function btw(){
   <div class="note ${dagen<0?'':'info'}">Periode ${dat(d.van)} t/m ${dat(d.tot)} · uiterlijk aangifte en betalen op <b>${dat(d.deadline)}</b>${dagen>=0?` (nog ${dagen} dagen)`:' (verstreken)'} · gerekend op <b>${d.stelsel}</b> (aan te passen bij Instellingen)</div>
   <div class="card" style="margin-top:12px"><table class="rub"><thead><tr><th>Rubriek</th><th>Omschrijving</th><th class="num">Omzet / grondslag (hele euro's)</th><th class="num">Btw</th></tr></thead><tbody>
    ${rub.map(line).join('')}
-   <tr class="tot"><td>5a</td><td>Verschuldigde btw (1a + 1b + 4a + 4b)</td><td></td><td class="num">${eur(d.verschuldigd_5a)}</td></tr>
+   <tr class="tot"><td>5a</td><td>Verschuldigde btw (1a + 1b + 4a + 4b)</td><td></td><td class="num">€ ${d.verschuldigd_5a_hele_euros.toLocaleString('nl-NL')}<div class="k">${eur(d.verschuldigd_5a)}</div></td></tr>
    ${line(r5)}
-   <tr class="tot"><td>5g</td><td>${d.saldo_5g>=0?'Totaal: te betalen aan de Belastingdienst':'Totaal: terug te vragen'}</td><td></td><td class="num ${d.saldo_5g>=0?'':'pos'}" style="font-size:16px">${eur(Math.abs(d.saldo_5g))}</td></tr></tbody></table></div>
+   <tr class="tot"><td>5g</td><td>${d.saldo_5g_hele_euros>=0?'Totaal: te betalen aan de Belastingdienst':'Totaal: terug te vragen'}</td><td></td><td class="num ${d.saldo_5g_hele_euros>=0?'':'pos'}" style="font-size:16px">€ ${Math.abs(d.saldo_5g_hele_euros).toLocaleString('nl-NL')}<div class="k">${eur(Math.abs(d.saldo_5g))}</div></td></tr></tbody></table></div>
   ${d.waarschuwingen.length?'<h2>Controleer vóór je indient</h2>'+d.waarschuwingen.map(w=>`<div class="note klik" onclick="editBoeking(${w.id})" style="cursor:pointer">${esc(w.tekst)}</div>`).join(''):'<div class="note ok">Geen aandachtspunten voor dit kwartaal.</div>'}
-  <p class="k">Zo gebruik je dit: log in bij Mijn Belastingdienst Zakelijk → Btw → aangifte, en neem de bedragen per rubriek over. Omzet-/grondslagbedragen vul je af op hele euro's in; btw-bedragen met centen. Bij gedeelde kosten tel ik alleen jouw aandeel van de voorbelasting mee. De app berekent, jij blijft verantwoordelijk voor de aangifte; laat twijfelgevallen (bijv. buitenlandse btw) door je boekhouder controleren.</p>`;
+  <p class="k">Zo gebruik je dit: log in bij Mijn Belastingdienst Zakelijk → Btw → aangifte, en neem de bedragen per rubriek over. Zoals in de echte aangifte zijn alle bedragen hele euro's: omzet en verschuldigde btw (1 t/m 4) naar beneden afgerond, voorbelasting (5b) naar boven. Eronder staat het exacte bedrag. Bij gedeelde kosten tel ik alleen jouw aandeel van de voorbelasting mee. De app berekent, jij blijft verantwoordelijk voor de aangifte; laat twijfelgevallen (bijv. buitenlandse btw) door je boekhouder controleren.</p>`;
   window._btw=d;
 }
-function csvBtw(){const d=window._btw;const rows=[['Rubriek','Omschrijving','Grondslag','Btw']];d.rubrieken.forEach(r=>rows.push([r.rubriek,r.omschrijving,r.grondslag,r.btw]));rows.push(['5a','Verschuldigde btw','',d.verschuldigd_5a],['5g','Saldo (positief = betalen)','',d.saldo_5g]);
+function csvBtw(){const d=window._btw;const rows=[['Rubriek','Omschrijving','Grondslag','Btw','Grondslag (hele euro)','Btw (hele euro)']];d.rubrieken.forEach(r=>rows.push([r.rubriek,r.omschrijving,r.grondslag,r.btw,r.rubriek==='5b'?'':r.grondslag_hele_euros,r.btw_hele_euros]));rows.push(['5a','Verschuldigde btw','',d.verschuldigd_5a,'',d.verschuldigd_5a_hele_euros],['5g','Saldo (positief = betalen)','',d.saldo_5g,'',d.saldo_5g_hele_euros]);
   d.rubrieken.forEach(r=>r.regels.forEach(x=>rows.push(['  '+r.rubriek,x.datum+' '+x.omschrijving,x.grondslag,x.btw])));
   const csv=rows.map(r=>r.map(c=>`"${String(c).replace(/"/g,'""')}"`).join(';')).join('\n');
   const a=document.createElement('a');a.href=URL.createObjectURL(new Blob(['﻿'+csv],{type:'text/csv'}));a.download=`btw-${d.jaar}-Q${d.kwartaal}.csv`;a.click();}

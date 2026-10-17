@@ -3,7 +3,7 @@
 """Lennar Finance - lokale app (geen installatie nodig, alleen Python 3).
 Start met Start.command (dubbelklik) of:  python3 server.py
 """
-import sqlite3, json, os, re, shutil, sys, threading, webbrowser, html, calendar, datetime as dt
+import sqlite3, json, os, re, shutil, sys, threading, webbrowser, html, calendar, math, datetime as dt
 from contextlib import closing
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote
@@ -375,6 +375,14 @@ def eff_datum(b, stelsel):
 
 
 # ---------------------------------------------------------------- btw
+def afr_neer(x):
+    return int(math.floor(round(x, 2) + 1e-9))
+
+
+def afr_op(x):
+    return int(math.ceil(round(x, 2) - 1e-9))
+
+
 RUBRIEKEN = [
     ('1a', 'Leveringen/diensten belast met 21%'),
     ('1b', 'Leveringen/diensten belast met 9%'),
@@ -429,12 +437,18 @@ def btw_calc(jaar, k):
         rub[key]['grondslag'] = r2(rub[key]['grondslag'])
         rub[key]['btw'] = r2(rub[key]['btw'])
         rub[key]['grondslag_hele_euros'] = int(rub[key]['grondslag'])
+        # zoals in de echte aangifte: omzet en verschuldigde btw naar beneden, voorbelasting naar boven (hele euro's)
+        rub[key]['btw_hele_euros'] = afr_op(rub[key]['btw']) if key == '5b' else afr_neer(rub[key]['btw'])
     verschuldigd = r2(sum(rub[x]['btw'] for x in ('1a', '1b', '4a', '4b')))
     voorbelasting = rub['5b']['btw']
+    verschuldigd_h = sum(rub[x]['btw_hele_euros'] for x in ('1a', '1b', '4a', '4b'))
+    voorbelasting_h = rub['5b']['btw_hele_euros']
     return {'jaar': jaar, 'kwartaal': k, 'van': s, 'tot': e, 'deadline': aangifte_deadline(jaar, k),
             'stelsel': stelsel, 'rubrieken': [rub[key] for key, _ in RUBRIEKEN],
             'verschuldigd_5a': verschuldigd, 'voorbelasting_5b': voorbelasting,
-            'saldo_5g': r2(verschuldigd - voorbelasting), 'waarschuwingen': waarschuwingen}
+            'saldo_5g': r2(verschuldigd - voorbelasting), 'waarschuwingen': waarschuwingen,
+            'verschuldigd_5a_hele_euros': verschuldigd_h, 'voorbelasting_5b_hele_euros': voorbelasting_h,
+            'saldo_5g_hele_euros': verschuldigd_h - voorbelasting_h}
 
 
 # ---------------------------------------------------------------- dashboard & verrekening
@@ -489,7 +503,7 @@ def btw_reserve():
             y, k = y + 1, 1
         if (y, k) > huidig:
             break
-        sd = btw_calc(y, k)['saldo_5g']
+        sd = btw_calc(y, k)['saldo_5g_hele_euros']
         items.append({'jaar': y, 'kwartaal': k, 'saldo': sd})
         tot += sd
     return r2(tot), items
@@ -507,7 +521,7 @@ def dashboard(jaar):
         prive = sum(b['bedrag_excl'] for b in rows if b['soort'] == 'prive_uitgave' and b['rekening'] == 'wise')
         bt = btw_calc(jaar, k)
         kw.append({'kwartaal': k, 'omzet': r2(omzet), 'omzet_mijn_deel': r2(omzet_mijn), 'kosten': r2(kosten),
-                   'overige_baten': r2(baten), 'winst': r2(omzet + baten - kosten), 'prive_wise': r2(prive), 'btw_saldo': bt['saldo_5g'], 'deadline': bt['deadline']})
+                   'overige_baten': r2(baten), 'winst': r2(omzet + baten - kosten), 'prive_wise': r2(prive), 'btw_saldo': bt['saldo_5g_hele_euros'], 'deadline': bt['deadline']})
     today = dt.date.today()
     open_f = q("SELECT * FROM boekingen WHERE soort='inkomst' AND betaald=0 AND " + NC + " ORDER BY datum")
     termijn = int(settings()['betaaltermijn'])
@@ -629,6 +643,25 @@ def archiveer(naam, datum, relatie):
     os.makedirs(ddir, exist_ok=True)
     rel = re.sub(r'[^A-Za-z0-9]+', '_', relatie or '').strip('_')
     fn = '%s_%s_%s' % (datum, rel, veilige_naam(naam)) if rel else '%s_%s' % (datum, veilige_naam(naam))
+    dest, i = os.path.join(ddir, fn), 1
+    while os.path.exists(dest):
+        stam, ext = os.path.splitext(fn)
+        dest = os.path.join(ddir, '%s_%d%s' % (stam, i, ext))
+        i += 1
+    shutil.move(src, dest)
+    return os.path.relpath(dest, BASE)
+
+
+def bewaar_aangifte(naam, jaar, kwartaal):
+    src = os.path.join(INBOX, os.path.basename(naam))
+    if not os.path.isfile(src):
+        raise ValueError('Bestand niet gevonden in de inbox: %s' % naam)
+    jaar, kwartaal = int(jaar), int(kwartaal)
+    if not (2000 <= jaar <= 2100 and 1 <= kwartaal <= 4):
+        raise ValueError('Ongeldig jaar of kwartaal')
+    ddir = os.path.join(BASE, 'btw', str(jaar), 'Q%d' % kwartaal)
+    os.makedirs(ddir, exist_ok=True)
+    fn = '%s_%s' % (dt.date.today().isoformat(), veilige_naam(naam))
     dest, i = os.path.join(ddir, fn), 1
     while os.path.exists(dest):
         stam, ext = os.path.splitext(fn)
@@ -980,6 +1013,8 @@ class H(BaseHTTPRequestHandler):
                 n = int(self.headers.get('Content-Length') or 0)
                 if n:
                     body = json.loads(self.rfile.read(n).decode('utf-8'))
+            if method == 'POST' and p == '/api/inbox/btw-aangifte':
+                return self.send(200, {'ok': True, 'pad': bewaar_aangifte(body.get('naam'), body.get('jaar'), body.get('kwartaal'))})
             if method == 'GET' and p in ('/', '/index.html'):
                 with open(os.path.join(BASE, 'index.html'), 'rb') as fh:
                     return self.send(200, fh.read(), 'text/html; charset=utf-8')
