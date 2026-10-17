@@ -815,7 +815,8 @@ def factuur_html(fid):
             prijs = r['prijs_tekst'] or (eur(r['prijs']) if r.get('prijs') is not None else '')
             regels += '<td class=num>%s</td><td class=num>%s</td>' % (e(aantal), e(prijs))
         regels += '<td class=num>%s</td></tr>' % eur(r['totaal'])
-    logo = '<img class=logo src="/logo.png" alt="">' if os.path.exists(os.path.join(DATA, 'logo.png')) else ''
+    logo_bestand = 'fluid-wordmark.png' if f['onder'] == 'fluid' and os.path.exists(os.path.join(DATA, 'fluid-wordmark.png')) else 'logo.png'
+    logo = '<img class=logo src="/%s" alt="">' % logo_bestand if os.path.exists(os.path.join(DATA, logo_bestand)) else ''
     voet = ''
     if f['onder'] == 'fluid' and cfg.get('voetregel_fluid'):
         voet = '<p class=sub>%s</p>' % '<br>'.join(e(x) for x in cfg['voetregel_fluid'].split('\n'))
@@ -1019,9 +1020,9 @@ class H(BaseHTTPRequestHandler):
                 with open(os.path.join(BASE, 'index.html'), 'rb') as fh:
                     return self.send(200, fh.read(), 'text/html; charset=utf-8')
             if method == 'GET' and p == '/favicon.ico':
-                return self.send(204, b'', 'image/x-icon')
-            if method == 'GET' and p == '/logo.png':
-                fp = os.path.join(DATA, 'logo.png')
+                p = '/favicon-32.png'
+            if method == 'GET' and p in ('/logo.png', '/favicon-32.png', '/app-icon-512.png', '/fluid-wordmark.png'):
+                fp = os.path.join(DATA, p[1:])
                 if os.path.exists(fp):
                     with open(fp, 'rb') as fh:
                         return self.send(200, fh.read(), 'image/png')
