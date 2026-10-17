@@ -172,8 +172,17 @@ async function go(p){document.body.classList.remove('menu');if(p==='dashboard'&&
 async function bank(){
   $('#main').innerHTML=`<div class="bar"><h1>Bank afstemmen</h1></div>
   <div class="drop" id="bz"><b>Sleep je bankafschriften (csv) hierheen</b> <span class="mut">of klik om te kiezen</span>
-   <div class="k" style="margin-top:6px">ING: Mijn ING → Zakelijk → Af- en bijschrijvingen → downloaden als csv. Wise: Rekeningafschriften → csv (EUR). Je kunt meerdere bestanden tegelijk kiezen. Er wordt niets automatisch geboekt; jij beslist per regel.</div>
-   <input type="file" id="bf" multiple accept=".csv" hidden></div><div id="bres"></div>`;
+   <div class="k" style="margin-top:6px">Er wordt niets automatisch geboekt; jij beslist per regel. Je kunt meerdere bestanden tegelijk kiezen.</div>
+   <input type="file" id="bf" multiple accept=".csv" hidden></div>
+  <div class="card" style="margin-top:12px"><b>Wat moet je uploaden?</b>
+   <ol class="k" style="margin:8px 0 0 18px;line-height:1.6">
+    <li><b>ING zakelijk</b>: Mijn ING → Zakelijk → Af- en bijschrijvingen → downloaden als <b>csv</b>. Kies de periode vanaf de datum van je laatste afstemming tot vandaag (bij twijfel: vanaf het begin van het vorige kwartaal; al gekoppelde regels worden herkend en niet dubbel geboekt).</li>
+    <li><b>Wise</b>: Rekeningafschriften → <b>csv</b>, valuta EUR, over dezelfde periode. Alleen nodig voor de Wise-kaart (zakelijke kosten en privé-uitgaven per maand).</li>
+    <li>Upload ING en Wise <b>samen</b> in één keer. Het eindsaldo van het bestand wordt vergeleken met je administratie, dus neem altijd de periode tot en met de laatste dag. Een te vroeg afgekapt bestand geeft een saldoverschil.</li>
+    <li>Wil je de <b>laatste week</b> afstemmen? Boek eerst je nieuwe facturen en btw-betalingen in de app, upload dan pas. Anders zie je ze hier als "nog niet in de administratie".</li>
+    <li>Eén keer per maand of kwartaal is genoeg. Doe het in elk geval vóór je btw-aangifte, zodat de aangifte op volledige gegevens rust.</li>
+   </ol>
+   <div class="k" style="margin-top:8px">Privé-bankafschriften (ING lopend en spaar) hoor je hier <b>niet</b> te uploaden; die horen in de map <code>inbox</code> voor het privé-overzicht.</div></div><div id="bres"></div>`;
   const dz=$('#bz'),fi=$('#bf');
   dz.onclick=()=>fi.click();
   dz.ondragover=e=>{e.preventDefault();dz.classList.add('over')};dz.ondragleave=()=>dz.classList.remove('over');
