@@ -120,7 +120,7 @@ h3{font:600 13px/1.3 var(--sans);letter-spacing:-.01em;margin:16px 0 6px}
 .tmb .ti{position:absolute;top:10px;left:12px;font-size:clamp(16px,34cqmin,64px);line-height:1}
 .tmb .tn{font-size:clamp(11px,11cqmin,18px);line-height:1.2}.tmb .tv{font-size:clamp(11px,10cqmin,16px);opacity:.9}.tmb .tp{position:absolute;top:10px;right:12px;font-size:clamp(10px,9cqmin,14px);opacity:.85}
 @container (max-height:62px){.tn,.tv{display:none}}@container (max-height:40px){.tp{display:none}}@container (max-width:70px){.tn,.tv,.tp{display:none}}
-.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.chip{border:1px solid var(--line2);background:var(--card);color:var(--tx);border-radius:999px;padding:4px 10px;cursor:pointer;font:inherit;font-size:13px}.chip:hover{background:var(--hover)}
+.chips{display:flex;flex-wrap:wrap;gap:6px;margin-top:8px}.chip{border:1px solid var(--line2);background:var(--card);color:var(--tx);border-radius:999px;padding:4px 10px;cursor:pointer;font:inherit;font-size:13px}.chip:hover{background:var(--hover)}.chip.on{background:var(--tx);color:var(--bg);border-color:var(--tx)}
 .pick{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}.pick button{width:34px;height:34px;border-radius:6px;border:2px solid transparent;background:var(--side);cursor:pointer;font-size:18px}.pick button.on{border-color:var(--tx)}.pick input{height:34px}
 </style>
 </head>
@@ -843,10 +843,11 @@ function editPvast(id){
 /* ------------------------------------------------ vermogen (net worth) */
 const ICONEN=['🏦','💰','📈','🪙','🌴','🏠','🚗','💻','📱','🏢','📦','💎','🎓','💳','🧾','🛡️','🏖️','🚲','🎸','📷','🏍️','⌚'];
 const KLEUREN=['#0f7b6c','#2383e2','#cb912f','#9065b0','#d9730d','#6b6b6b','#529cca','#448361','#c4554d','#e03e3e','#ad1a72','#9b9a97'];
-function vermogenReeks(v){
-  // per maand-eind: laatste bekende waarde per bezit (schulden negatief) + bankrekeningen
-  const zk=[...v.zakelijk.hist,[new Date().toISOString().slice(0,10),v.zakelijk.saldo]];
-  const pts=[...v.hist.map(h=>h.datum),...Object.values(v.bank).flatMap(l=>l.map(x=>x[0])),...zk.map(x=>x[0])].sort();
+const VAST_CATS=['Vastgoed','Hypotheek'];
+const vmSt={vast:true,rek:'netto'};
+// per maand-eind een waarde: f(grens) geeft de stand op die datum; begint bij de eerste datum in pts, maximaal 36 maanden terug
+function maandReeks(pts,f){
+  pts=pts.filter(Boolean).sort();
   if(!pts.length)return [];
   const nu=new Date(),eind=new Date(nu.getFullYear(),nu.getMonth(),1);
   let d=new Date(+pts[0].slice(0,4),+pts[0].slice(5,7)-1,1);
@@ -854,12 +855,35 @@ function vermogenReeks(v){
   const uit=[],iso=x=>`${x.getFullYear()}-${String(x.getMonth()+1).padStart(2,'0')}-${String(x.getDate()).padStart(2,'0')}`;
   for(;d<=eind;d=new Date(d.getFullYear(),d.getMonth()+1,1)){
     const laatste=d.getTime()===eind.getTime(),grens=laatste?iso(nu):iso(new Date(d.getFullYear(),d.getMonth()+1,0));
-    const last=l=>{let w=null;for(const [dat_,x] of l){if(dat_<=grens)w=x;else break}return w};
-    const perBezit={};v.hist.forEach(h=>{if(h.datum<=grens)perBezit[h.bezit_id]=h.waarde});
-    const tot=Object.values(perBezit).reduce((a,x)=>a+x,0)+Object.values(v.bank).reduce((a,l)=>a+(last(l)||0),0)+(last(zk)||0);
-    uit.push({n:MND[d.getMonth()]+(d.getMonth()===0||!uit.length?' '+String(d.getFullYear()).slice(2):''),w:tot});
+    uit.push({n:MND[d.getMonth()]+(d.getMonth()===0||!uit.length?' '+String(d.getFullYear()).slice(2):''),w:f(grens)});
   }
   return uit;
+}
+const laatsteStand=(l,grens)=>{let w=null;for(const [dat_,x] of l){if(dat_<=grens)w=x;else break}return w};
+// netto vermogen per maand-eind: laatste bekende waarde per bezit (schulden negatief) + bankrekeningen; weg = ids die worden overgeslagen
+function vermogenReeks(v,weg=new Set()){
+  const zk=[...v.zakelijk.hist,[new Date().toISOString().slice(0,10),v.zakelijk.saldo]];
+  const pts=[...v.hist.map(h=>h.datum),...Object.values(v.bank).flatMap(l=>l.map(x=>x[0])),...zk.map(x=>x[0])];
+  return maandReeks(pts,grens=>{
+    const perBezit={};v.hist.forEach(h=>{if(h.datum<=grens&&!weg.has(h.bezit_id))perBezit[h.bezit_id]=h.waarde});
+    return Object.values(perBezit).reduce((a,x)=>a+x,0)+Object.values(v.bank).reduce((a,l)=>a+(laatsteStand(l,grens)||0),0)+(laatsteStand(zk,grens)||0);
+  });
+}
+// saldo van één rekening per maand-eind ('zakelijk' of de naam van een privérekening)
+function rekeningReeks(v,key){
+  const l=key==='zakelijk'?[...v.zakelijk.hist,[new Date().toISOString().slice(0,10),v.zakelijk.saldo]]:(v.bank[key]||[]);
+  return maandReeks(l.map(x=>x[0]),grens=>laatsteStand(l,grens)||0);
+}
+function lijnGrafiek(r,kleur='var(--acc)'){
+  if(r.length<2)return '<div class="note info">Nog te weinig meetpunten voor een grafiek.</div>';
+  const W=600,H=190,P=22,lo=Math.min(0,...r.map(x=>x.w)),hi=Math.max(0,...r.map(x=>x.w)),span=(hi-lo)||1;
+  const x=i=>P+i*(W-2*P)/(r.length-1),y=w=>H-22-(w-lo)/span*(H-42);
+  const pad=r.map((p,i)=>`${x(i)},${y(p.w)}`).join(' '),stap=Math.ceil(r.length/8);
+  return `<svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto"><line x1="${P}" x2="${W-P}" y1="${y(0)}" y2="${y(0)}" stroke="var(--line)" stroke-dasharray="4"/>
+   <polygon points="${x(0)},${y(0)} ${pad} ${x(r.length-1)},${y(0)}" fill="${kleur}" opacity=".12"/><polyline points="${pad}" fill="none" stroke="${kleur}" stroke-width="2.2" stroke-linejoin="round"/>
+   ${r.map((p,i)=>`<circle cx="${x(i)}" cy="${y(p.w)}" r="${r.length>18?2:3.5}" fill="${p.w<0?'var(--bad)':kleur}"><title>${p.n}: ${eur(p.w)}</title></circle>`).join('')}
+   <text x="${P}" y="12" font-size="10" fill="var(--mut)">${eur(hi)}</text><text x="${P}" y="${H-10}" font-size="10" fill="var(--mut)" ${lo<0?'':'style="display:none"'}>${eur(lo)}</text>
+   ${r.map((p,i)=>i%stap===0||i===r.length-1?`<text x="${x(i)}" y="${H-1}" font-size="10" text-anchor="middle" fill="var(--mut)">${p.n}</text>`:'').join('')}</svg>`;
 }
 
 function treemap(items,x,y,w,h,out){
@@ -878,28 +902,29 @@ function blokken(l,totaal,hoogte,leeg){
 }
 async function privevermogen(){
   const v=await api('GET','prive/vermogen');cache.pbezit=v.items;cache.pcats=v.cats;
-  const act=v.items.filter(x=>x.actief),bank=v.saldos.reduce((a,r)=>a+r.saldo,0),zak=v.zakelijk.saldo;
+  const metVast=vmSt.vast,uitV=c=>!metVast&&VAST_CATS.includes(c);
+  const weg=new Set(metVast?[]:v.items.filter(x=>VAST_CATS.includes(x.categorie)).map(x=>x.id));
+  const act=v.items.filter(x=>x.actief&&!weg.has(x.id)),bank=v.saldos.reduce((a,r)=>a+r.saldo,0),zak=v.zakelijk.saldo;
   const som=(soort,naam)=>act.filter(x=>x.soort===soort&&x.categorie===naam).reduce((a,x)=>a+x.waarde,0);
-  const bl=v.cats.filter(c=>c.soort==='bezit').map(c=>({...c,bedrag:som('bezit',c.naam)}));
+  const bl=v.cats.filter(c=>c.soort==='bezit'&&!uitV(c.naam)).map(c=>({...c,bedrag:som('bezit',c.naam)}));
   if(bank>0)bl.push({id:0,naam:'Bankrekeningen',icoon:'🏦',kleur:'#4b5563',bedrag:bank});
   if(zak>0)bl.push({id:0,naam:'Zakelijk (Lenffect)',icoon:'🏢',kleur:'#2383e2',bedrag:zak});
-  const sl=v.cats.filter(c=>c.soort==='schuld').map(c=>({...c,bedrag:som('schuld',c.naam)}));
+  const sl=v.cats.filter(c=>c.soort==='schuld'&&!uitV(c.naam)).map(c=>({...c,bedrag:som('schuld',c.naam)}));
   const totB=bl.reduce((a,c)=>a+c.bedrag,0)+(bank>0?0:bank)+(zak>0?0:zak),totS=sl.reduce((a,c)=>a+c.bedrag,0),net=totB-totS;
-  const reeks=vermogenReeks(v),maandStart=new Date().toISOString().slice(0,8)+'01',heeftHist=new Set(v.hist.map(x=>x.datum.slice(0,7))).size>1;
+  const reeks=vermogenReeks(v,weg),maandStart=new Date().toISOString().slice(0,8)+'01',heeftHist=new Set(v.hist.map(x=>x.datum.slice(0,7))).size>1;
   const vorig=heeftHist&&reeks.length>1?reeks[reeks.length-2].w:null,delta=vorig===null?null:net-vorig;
-  const hi=Math.max(1,...reeks.map(r=>r.w)),lo=Math.min(0,...reeks.map(r=>r.w)),span=hi-lo||1;
-  $('#main').innerHTML=`<div class="bar"><h1>Privé · Vermogen</h1><span class="sp"></span><button class="b sec" onclick="editCat(0,'schuld')">+ Schuldcategorie</button><button class="b" onclick="editCat(0,'bezit')">+ Categorie</button></div>
+  $('#main').innerHTML=`<div class="bar"><h1>Privé · Vermogen</h1><span class="sp"></span><div class="chips" style="margin:0 6px 0 0"><button class="chip ${metVast?'on':''}" onclick="vmSt.vast=true;privevermogen()">Met vastgoed</button><button class="chip ${metVast?'':'on'}" onclick="vmSt.vast=false;privevermogen()" title="Zonder woning en hypotheek: alleen liquide middelen en beleggingen">Liquide</button></div><button class="b sec" onclick="editCat(0,'schuld')">+ Schuldcategorie</button><button class="b" onclick="editCat(0,'bezit')">+ Categorie</button></div>
   <div class="grid g4" style="grid-template-columns:repeat(auto-fit,minmax(170px,1fr))">
-   <div class="card stat"><div class="k">Netto vermogen</div><div class="big ${net<0?'neg':'pos'}">${eur(net)}</div>${delta===null?'':`<div class="k ${delta<0?'neg':'pos'}">${delta<0?'−':'+'} ${eur(Math.abs(delta))} t.o.v. vorige maand</div>`}</div>
+   <div class="card stat"><div class="k">Netto vermogen${metVast?'':' (liquide)'}</div><div class="big ${net<0?'neg':'pos'}">${eur(net)}</div>${delta===null?'':`<div class="k ${delta<0?'neg':'pos'}">${delta<0?'−':'+'} ${eur(Math.abs(delta))} t.o.v. vorige maand</div>`}</div>
    <div class="card stat"><div class="k">Bezittingen</div><div class="big">${eur(totB)}</div></div>
    <div class="card stat"><div class="k">Schulden</div><div class="big ${totS?'neg':''}">${eur(totS)}</div></div></div>
+  ${metVast?'':'<div class="k" style="margin-top:8px">Zonder categorieën Vastgoed en Hypotheek.</div>'}
   <h2>Bezittingen</h2>${blokken(bl,totB,320,'Nog geen bedragen. Klik op "+ Categorie" of kies hieronder een categorie.')}
   <div class="chips">${v.cats.filter(c=>c.soort==='bezit').map(c=>`<button class="chip" onclick="editCat(${c.id})"><span>${c.icoon}</span> ${esc(c.naam)} <b>${eur(som('bezit',c.naam))}</b></button>`).join('')}</div>
   <h2>Schulden</h2>${blokken(sl,totS,200,'Geen schulden ingevoerd.')}
   <div class="chips">${v.cats.filter(c=>c.soort==='schuld').map(c=>`<button class="chip" onclick="editCat(${c.id})"><span>${c.icoon}</span> ${esc(c.naam)} <b>${eur(som('schuld',c.naam))}</b></button>`).join('')}</div>
-  ${heeftHist&&reeks.length>1?`<h2>Verloop per maand</h2><div class="card"><div style="display:flex;gap:4px;align-items:stretch;height:130px;margin-bottom:6px">${reeks.map(r=>`<div style="flex:1;display:flex;flex-direction:column;justify-content:flex-end" title="${r.n}: ${eur(r.w)}"><i style="display:block;background:${r.w<0?'var(--bad)':'var(--acc)'};height:${Math.max(2,Math.abs(r.w)/span*100)}%;border-radius:3px 3px 0 0;opacity:.85"></i></div>`).join('')}</div>
-   <div style="display:flex;gap:4px;font-size:11px;color:var(--mut)">${reeks.map(r=>`<span style="flex:1;text-align:center;overflow:hidden">${r.n}</span>`).join('')}</div>
-   <div class="k" style="margin-top:6px">Elke keer dat je een bedrag aanpast, wordt de waarde vastgelegd; bankrekeningen volgen automatisch uit de afschriften.</div></div>`:'<div class="note info">Het verloop verschijnt zodra je bedragen over meerdere maanden hebt bijgewerkt.</div>'}
+  <h2>Waardeontwikkeling</h2><div class="chips" style="margin:0 0 8px"><button class="chip ${vmSt.rek==='netto'?'on':''}" onclick="vmSt.rek='netto';privevermogen()">Netto vermogen</button><button class="chip ${vmSt.rek==='zakelijk'?'on':''}" onclick="vmSt.rek='zakelijk';privevermogen()">Zakelijk ING</button>${Object.keys(v.bank).map(k=>`<button class="chip ${vmSt.rek===k?'on':''}" onclick="vmSt.rek=this.dataset.k;privevermogen()" data-k="${esc(k)}">${esc(k)}</button>`).join('')}</div>
+  <div class="card">${lijnGrafiek(vmSt.rek==='netto'?reeks:rekeningReeks(v,vmSt.rek),vmSt.rek==='zakelijk'?'var(--blue)':'var(--acc)')}<div class="k" style="margin-top:6px">${vmSt.rek==='netto'?'Stand per maand-eind'+(metVast?'':' (zonder vastgoed en hypotheek)')+'. Elke keer dat je een bedrag aanpast, wordt de waarde vastgelegd; bankrekeningen volgen uit de afschriften.':'Saldo per maand-eind.'}</div></div>
   <h2>Bankrekeningen (automatisch)</h2><table><tbody><tr><td><b>Zakelijk · ING Lenffect</b><div class="k">${v.zakelijk.berekend?'berekend uit boekingen':'afgestemd met bank'}${v.zakelijk.datum?', per '+dat(v.zakelijk.datum):''} · incl. btw-reserve en geld van Jelmer</div></td><td class="num">${eur(zak)}</td></tr>${v.saldos.map(r=>`<tr><td><b>${esc(r.rekening)}</b><div class="k">uit afschriften, per ${dat(r.datum)}</div></td><td class="num">${eur(r.saldo)}</td></tr>`).join('')}</tbody></table>`;
 }
 function editCat(id,soort){
@@ -940,7 +965,13 @@ function editCat(id,soort){
 const PP0={start:0,opname:2500,extra_uit:0,schommel:0,maanden:12,variabel:null,opname_laag:null,opname_hoog:null,baan:0,baan_modus:'netto',baan_inhouding:30,baan_start:0};
 function ppLaad(){let m={};try{m=JSON.parse(state.instellingen.prive_prognose||'{}')}catch(e){}return {...PP0,...m}}
 let _ppT;function ppBewaar(m){clearTimeout(_ppT);_ppT=setTimeout(async()=>{state.instellingen.prive_prognose=JSON.stringify(m);await api('PUT','instellingen',{prive_prognose:state.instellingen.prive_prognose})},600)}
+const PS0={start:0,inkomen:null,vast:null,variabel:null,marge:20,maanden:12};
+function psLaad(){let m={};try{m=JSON.parse(state.instellingen.prive_prognose_simpel||'{}')}catch(e){}return {...PS0,...m}}
+let _psT;function psBewaar(m){clearTimeout(_psT);_psT=setTimeout(async()=>{state.instellingen.prive_prognose_simpel=JSON.stringify(m);await api('PUT','instellingen',{prive_prognose_simpel:state.instellingen.prive_prognose_simpel})},600)}
+async function ppModus(x){state.instellingen.prive_prognose_modus=x;await api('PUT','instellingen',{prive_prognose_modus:x});priveprog()}
+const ppKop=(modus)=>`<div class="bar"><h1>Privé · Prognose</h1><span class="sp"></span><div class="chips" style="margin:0"><button class="chip ${modus==='simpel'?'on':''}" onclick="ppModus('simpel')">Eenvoudig</button><button class="chip ${modus==='uitgebreid'?'on':''}" onclick="ppModus('uitgebreid')">Uitgebreid</button></div></div>`;
 async function priveprog(){
+  if((state.instellingen.prive_prognose_modus||'simpel')==='simpel')return priveprogSimpel();
   const nu=new Date(),j=nu.getFullYear();
   const d=await priveData(j),alle=[...d.mut,...d.wise].filter(x=>x.soort==='uitgave');
   // gemiddelde variabele uitgaven: laatste 3 volle maanden met data
@@ -950,7 +981,7 @@ async function priveprog(){
   const gemVar=alleJr.reduce((a,x)=>a+x.bedrag,0)/3;
   const vastU=d.vast.filter(v=>v.actief&&v.soort==='uitgave').reduce((a,v)=>a+perMaand(v),0),vastI=d.vast.filter(v=>v.actief&&v.soort==='inkomen').reduce((a,v)=>a+perMaand(v),0);
   const m=ppLaad();if(m.variabel==null)m.variabel=Math.round(gemVar);if(m.opname_laag==null)m.opname_laag=Math.round(m.opname*0.6);if(m.opname_hoog==null)m.opname_hoog=Math.round(m.opname*1.4);
-  $('#main').innerHTML=`<div class="bar"><h1>Privé · Prognose</h1></div>
+  $('#main').innerHTML=`${ppKop('uitgebreid')}
   <p class="k" style="margin-top:-8px">Hoeveel blijft er over de komende maanden? Pas aan en je ziet direct het effect. Je kunt rekenen in de vakken. Wijzigingen worden bewaard.</p>
   <div class="rv" style="grid-template-columns:minmax(0,320px) minmax(0,1fr)"><div class="card" id="ppin">
    <label class="f" style="display:block;margin-bottom:8px"><span>Huidig privé-saldo (€)</span><input type="number" step="any" name="start"></label>
@@ -968,6 +999,51 @@ async function priveprog(){
   const f=$('#ppin');setv(f,m);
   const upd=()=>{const x={};['start','opname','opname_laag','opname_hoog','baan','baan_start','variabel','extra_uit','schommel','maanden'].forEach(k=>x[k]=parseFloat(val(f,k))||0);x.baan_start=Math.max(0,Math.round(x.baan_start));x.baan_modus=val(f,'baan_modus')==='bruto'?'bruto':'netto';x.maanden=Math.min(36,Math.max(1,Math.round(x.maanden)||12));ppBewaar(x);ppToon(x,vastU,vastI)};
   f.addEventListener('input',upd);ppToon(m,vastU,vastI);
+}
+async function priveprogSimpel(){
+  const nu=new Date(),j=nu.getFullYear(),d=await priveData(j),saldos=await api('GET','prive/saldos');
+  const mk=[1,2,3].map(i=>maandStr(new Date(nu.getFullYear(),nu.getMonth()-i,15)));
+  const vorig=await priveData(j-1);
+  const gemVar=[...vorig.mut,...vorig.wise,...d.mut,...d.wise].filter(x=>x.soort==='uitgave'&&mk.some(k=>x.datum.startsWith(k))).reduce((a,x)=>a+x.bedrag,0)/3;
+  const vastU=d.vast.filter(v=>v.actief&&v.soort==='uitgave').reduce((a,v)=>a+perMaand(v),0),vastI=d.vast.filter(v=>v.actief&&v.soort==='inkomen').reduce((a,v)=>a+perMaand(v),0);
+  const pp=ppLaad(),m=psLaad();
+  if(m.inkomen==null)m.inkomen=Math.round(pp.opname+vastI);if(m.vast==null)m.vast=Math.round(vastU);if(m.variabel==null)m.variabel=Math.round(gemVar);
+  if(!m.start)m.start=Math.round(saldos.reduce((a,r)=>a+r.saldo,0));
+  $('#main').innerHTML=`${ppKop('simpel')}
+  <p class="k" style="margin-top:-8px">Vier getallen: inkomen, vaste uitgaven, variabele uitgaven (schatting) en hoeveel die kunnen afwijken. Wijzigingen worden bewaard.</p>
+  <div class="rv" style="grid-template-columns:minmax(0,320px) minmax(0,1fr)"><div class="card" id="psin">
+   <label class="f" style="display:block;margin-bottom:8px"><span>Huidig saldo (€) <span class="k">som van je rekeningen</span></span><input type="number" step="any" name="start"></label>
+   <label class="f" style="display:block;margin-bottom:8px"><span>Inkomen per maand (€)</span><input type="number" step="any" name="inkomen"></label>
+   <label class="f" style="display:block;margin-bottom:8px"><span>Uitgaven vast per maand (€) <span class="k">uit Vaste lasten: ${eur(vastU)}</span></span><input type="number" step="any" name="vast"></label>
+   <label class="f" style="display:block;margin-bottom:8px"><span>Uitgaven variabel, schatting (€) <span class="k">gemiddelde laatste 3 mnd: ${eur(gemVar)}</span></span><input type="number" step="any" name="variabel"></label>
+   <label class="f" style="display:block;margin-bottom:8px"><span>Afwijking variabel (± %) <span class="k">20 = tussen −20% en +20%</span></span><input type="number" step="any" min="0" name="marge"></label>
+   <label class="f" style="display:block"><span>Aantal maanden vooruit</span><input type="number" step="1" name="maanden"></label></div><div id="psout"></div></div>`;
+  const f=$('#psin');setv(f,m);
+  const upd=()=>{const x={};['start','inkomen','vast','variabel','marge','maanden'].forEach(k=>x[k]=parseFloat(val(f,k))||0);x.marge=Math.max(0,x.marge);x.maanden=Math.min(36,Math.max(1,Math.round(x.maanden)||12));psBewaar(x);psToon(x)};
+  f.addEventListener('input',upd);psToon(m);
+}
+function psToon(m){
+  const p=m.marge/100,nu=new Date(),uit={laag:m.vast+m.variabel*(1+p),mid:m.vast+m.variabel,hoog:m.vast+m.variabel*(1-p)};  // laag = veel uitgaven
+  const rij=Array.from({length:m.maanden},(_,i)=>({n:new Date(nu.getFullYear(),nu.getMonth()+i+1,1).toLocaleDateString('nl-NL',{month:'short',year:'2-digit'}),
+    laag:m.start+(i+1)*(m.inkomen-uit.laag),saldo:m.start+(i+1)*(m.inkomen-uit.mid),hoog:m.start+(i+1)*(m.inkomen-uit.hoog)}));
+  const over=m.inkomen-uit.mid,alleW=[m.start,...rij.flatMap(r=>[r.laag,r.saldo,r.hoog])],lo=Math.min(...alleW),hi=Math.max(...alleW),span=(hi-lo)||1;
+  const W=560,H=160,x=i=>20+i*(W-40)/Math.max(1,rij.length-1),y=v=>H-14-(v-lo)/span*(H-34),lijn=k=>rij.map((r,i)=>`${x(i)},${y(r[k])}`).join(' ');
+  const band=lijn('hoog')+' '+rij.map((r,i)=>`${x(rij.length-1-i)},${y(rij[rij.length-1-i].laag)}`).join(' ');
+  const nul=lo<0&&hi>0?`<line x1="20" x2="${W-20}" y1="${y(0)}" y2="${y(0)}" stroke="var(--line)" stroke-dasharray="4"/>`:'';
+  const neg=rij.find(r=>r.saldo<0),negL=rij.find(r=>r.laag<0),eind=rij[rij.length-1];
+  $('#psout').innerHTML=`<div class="grid g4" style="grid-template-columns:repeat(auto-fit,minmax(160px,1fr))">
+   <div class="card stat"><div class="k">Inkomen per maand</div><div class="big pos">${eur(m.inkomen)}</div></div>
+   <div class="card stat"><div class="k">Uitgaven per maand</div><div class="big">${eur(uit.mid)}</div><div class="k">${eur(m.vast)} vast + ${eur(m.variabel)} variabel</div></div>
+   <div class="card stat"><div class="k">Houdt over per maand</div><div class="big ${over<0?'neg':'pos'}">${eur(over)}</div><div class="k">range ${eur(m.inkomen-uit.laag)} t/m ${eur(m.inkomen-uit.hoog)}</div></div>
+   <div class="card stat"><div class="k">Saldo over ${m.maanden} mnd</div><div class="big ${eind.saldo<0?'neg':''}">${eur(eind.saldo)}</div><div class="k">range ${eur(eind.laag)} t/m ${eur(eind.hoog)}</div></div></div>
+  ${neg?`<div class="note" style="margin-top:14px">Verwacht scenario: saldo onder nul in ${esc(neg.n)}.</div>`
+    :negL?`<div class="note" style="margin-top:14px">Verwacht blijft positief, maar bij +${m.marge}% variabele uitgaven ga je onder nul in ${esc(negL.n)}.</div>`
+    :`<div class="note ok" style="margin-top:14px">Saldo blijft positief de komende ${m.maanden} maanden, ook bij +${m.marge}% variabele uitgaven.</div>`}
+  <h2>Saldo-verloop</h2><div class="card"><svg viewBox="0 0 ${W} ${H}" style="width:100%;height:auto">${nul}<polygon points="${band}" fill="var(--blue)" opacity=".15"/>
+   <polyline points="${lijn('hoog')}" fill="none" stroke="var(--blue)" stroke-width="1.2" stroke-dasharray="4 3"/><polyline points="${lijn('laag')}" fill="none" stroke="var(--blue)" stroke-width="1.2" stroke-dasharray="4 3"/>
+   <polyline points="${lijn('saldo')}" fill="none" stroke="var(--blue)" stroke-width="2.5"/>
+   ${rij.filter((_,i)=>i%Math.ceil(rij.length/8)===0||i===rij.length-1).map(r=>`<text x="${x(rij.indexOf(r))}" y="${H-1}" font-size="10" text-anchor="middle" fill="var(--mut)">${r.n}</text>`).join('')}</svg>
+   <div class="k">Lijn = verwacht, gearceerd = variabele uitgaven ${m.marge}% lager of hoger.</div></div>`;
 }
 function ppToon(m,vastU,vastI){
   const inh=Math.min(99,Math.max(0,m.baan_inhouding))/100,bruto=m.baan_modus==='bruto';
