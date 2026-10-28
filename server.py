@@ -3,7 +3,7 @@
 """Lennar Finance - lokale app (geen installatie nodig, alleen Python 3).
 Start met Start.command (dubbelklik) of:  python3 server.py
 """
-import sqlite3, json, os, re, shutil, sys, threading, webbrowser, html, calendar, math, datetime as dt
+import sqlite3, json, os, re, shutil, subprocess, sys, threading, time, webbrowser, html, calendar, math, datetime as dt
 from contextlib import closing
 from http.server import ThreadingHTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote
@@ -686,6 +686,60 @@ def concepten():
     return rows
 
 
+# ---------------------------------------------------------------- inbox automatisch verwerken (Claude Code headless)
+VERWERK = {'status': 'idle', 'start': None, 'einde': None, 'melding': '', 'uitvoer': ''}
+VERWERK_LOCK = threading.Lock()
+VERWERK_PROMPT = (
+    "Verwerk de inbox van deze administratie volgens de 'Werkwijze facturen (inbox)' in CLAUDE.md. "
+    "Voor elk bestand in inbox/: lees het (pdftotext of Read), bepaal datum, leverancier, bedrag excl./btw, btw-soort, "
+    "betaaldatum en wie het betaalt, controleer op dubbelen in de database (alleen lezen met sqlite3 -readonly), "
+    "schrijf een JSON-lijst naar data/tmp_concepten.json en draai: python3 hulpmiddelen/concept_toevoegen.py data/tmp_concepten.json. "
+    "Alleen CONCEPTEN, nooit definitieve boekingen, en wijzig de database niet op een andere manier. "
+    "Een btw-aangifte of privé-bankafschrift laat je staan en noem je in je antwoord. Verwijder data/tmp_concepten.json daarna. "
+    "Sluit af met één korte Nederlandse regel: hoeveel concepten, en wat je liet staan en waarom.")
+
+
+def claude_pad():
+    for p in (shutil.which('claude'), os.path.expanduser('~/.local/bin/claude'), '/opt/homebrew/bin/claude', '/usr/local/bin/claude'):
+        if p and os.path.isfile(p):
+            return p
+    return None
+
+
+def _verwerk_run(cli, aantal):
+    try:
+        os.makedirs(os.path.join(DATA, 'backup'), exist_ok=True)
+        shutil.copy2(DB, os.path.join(DATA, 'backup', 'administratie_voor_inbox_%s.db' % time.strftime('%Y%m%d_%H%M%S')))
+        r = subprocess.run(
+            [cli, '-p', VERWERK_PROMPT, '--permission-mode', 'acceptEdits',
+             '--allowedTools', 'Read', 'Write', 'Bash(pdftotext:*)', 'Bash(sqlite3 -readonly:*)',
+             'Bash(python3 hulpmiddelen/concept_toevoegen.py:*)', 'Bash(rm data/tmp_concepten.json)', 'Bash(ls:*)'],
+            cwd=BASE, capture_output=True, text=True, timeout=900, stdin=subprocess.DEVNULL)
+        rest = len(inbox_bestanden())
+        with VERWERK_LOCK:
+            VERWERK.update(status='klaar' if r.returncode == 0 else 'fout', einde=time.time(),
+                           uitvoer=(r.stdout or r.stderr or '').strip()[-1500:],
+                           melding='%d van %d bestand(en) verwerkt.' % (aantal - rest, aantal) if r.returncode == 0 else 'Claude gaf een foutmelding.')
+    except Exception as e:
+        with VERWERK_LOCK:
+            VERWERK.update(status='fout', einde=time.time(), melding='Mislukt: %s' % e, uitvoer='')
+
+
+def start_verwerk():
+    with VERWERK_LOCK:
+        if VERWERK['status'] == 'bezig':
+            return dict(VERWERK)
+        cli = claude_pad()
+        if not cli:
+            raise ValueError('Claude Code (opdracht "claude") is niet gevonden op deze Mac.')
+        n = len(inbox_bestanden())
+        if not n:
+            raise ValueError('De inbox is leeg.')
+        VERWERK.update(status='bezig', start=time.time(), einde=None, melding='', uitvoer='')
+    threading.Thread(target=_verwerk_run, args=(cli, n), daemon=True).start()
+    return dict(VERWERK)
+
+
 def pad_in(basis, rel):
     fp = os.path.normpath(os.path.join(BASE, rel))
     return fp if fp.startswith(os.path.normpath(basis) + os.sep) and os.path.isfile(fp) else None
@@ -1074,6 +1128,11 @@ class H(BaseHTTPRequestHandler):
                 c.execute("UPDATE instellingen SET waarde=? WHERE sleutel='ing_saldo_datum'", (d,))
                 c.commit()
             return {'ok': True}
+        if p == 'inbox/verwerk' and method == 'POST':
+            return start_verwerk()
+        if p == 'inbox/verwerk' and method == 'GET':
+            with VERWERK_LOCK:
+                return dict(VERWERK)
         if p == 'inbox' and method == 'GET':
             return {'map': INBOX, 'bestanden': inbox_bestanden(), 'concepten': concepten()}
         if p == 'boekingen' and method == 'POST':

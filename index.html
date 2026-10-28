@@ -293,14 +293,15 @@ function gaBtw(j,k){state.btwSel={y:j,q:k};go('btw')}
 /* ------------------------------------------------ inbox */
 async function inbox(){
   const d=await api('GET','inbox');cache.inbox=d;
-  $('#main').innerHTML=`<div class="bar"><h1>Inbox</h1></div>
+  $('#main').innerHTML=`<div class="bar"><h1>Inbox</h1><span id="vwk"></span></div>
   <div class="drop" id="dz"><b>Sleep facturen hierheen</b> <span class="mut">of klik om te kiezen (pdf, jpg, png)</span>
-   <div class="k" style="margin-top:6px">Je kunt bestanden ook rechtstreeks in de map <code>inbox</code> naast dit programma zetten. Zeg daarna tegen Claude: "verwerk de inbox". Die maakt er concepten van die jij hier controleert. Een btw-aangifte? Klik bij het bestand op "Btw-aangifte": die wordt bewaard in <code>btw/jaar/kwartaal</code>.</div>
+   <div class="k" style="margin-top:6px">Je kunt bestanden ook rechtstreeks in de map <code>inbox</code> naast dit programma zetten. Klik daarna op "Verwerk inbox": Claude maakt er concepten van die jij hier controleert. Een btw-aangifte? Klik bij het bestand op "Btw-aangifte": die wordt bewaard in <code>btw/jaar/kwartaal</code>.</div>
    <input type="file" id="fi" multiple accept=".pdf,.png,.jpg,.jpeg,.webp,.heic" hidden></div>
   <h2>Concepten om te controleren (${d.concepten.length})</h2>
   ${d.concepten.length?`<table><thead><tr><th>Datum</th><th>Omschrijving</th><th class="num">Excl.</th><th class="num">Btw</th><th>Btw-soort</th><th>Van wie</th><th></th></tr></thead><tbody>${d.concepten.map(b=>`<tr class="klik" onclick="editBoeking(${b.id})"><td>${dat(b.datum)}</td><td>${esc(b.omschrijving)}<div class="k">${esc(b.relatie)}${b.bijlage?' · 📎 '+esc(b.bijlage.split('/').pop()):''}</div></td><td class="num">${eur(b.bedrag_excl)}</td><td class="num">${eur(b.btw_bedrag)}</td><td class="sm">${BTWS[b.btw_soort]}</td><td>${tag(b)}</td><td>${b.mogelijk_dubbel.length?'<span class="tag bad">mogelijk dubbel</span>':''} ${b.controleren?'<span class="tag flag">controleren</span>':''}</td></tr>`).join('')}</tbody></table><p class="k">Klik een concept open: links zie je de factuur, rechts de ingevulde gegevens. Pas aan wat niet klopt en klik op Goedkeuren. Pas dan telt hij mee in je btw en overzicht.</p>`:'<div class="note ok">Geen concepten die op controle wachten.</div>'}
   <h2>Nog te verwerken bestanden (${d.bestanden.length})</h2>
   ${d.bestanden.length?`<table><thead><tr><th>Bestand</th><th>Toegevoegd</th><th class="num">Grootte</th><th></th></tr></thead><tbody>${d.bestanden.map((f,i)=>`<tr><td><a href="/inbox/${encodeURIComponent(f.naam)}" target="_blank">${esc(f.naam)}</a></td><td class="sm">${f.datum}</td><td class="num sm">${Math.round(f.grootte/1024)} kB</td><td class="num"><button class="b sec" onclick="maakUitInbox(${i})">Zelf boeking maken</button> <button class="b sec" onclick="bewaarAangifte(${i})">Btw-aangifte</button></td></tr>`).join('')}</tbody></table>`:'<div class="note info">De inbox is leeg.</div>'}`;
+  verwerkKnop();verwerkHervat();
   const dz=$('#dz'),fi=$('#fi');
   dz.onclick=()=>fi.click();fi.onchange=()=>uploadFiles(fi.files);
   dz.ondragover=e=>{e.preventDefault();dz.classList.add('over')};dz.ondragleave=()=>dz.classList.remove('over');
@@ -317,6 +318,26 @@ async function bewaarAangifte(i){
   const x=inv.match(/(20\d\d)\D*Q?([1-4])/i);if(!x)return toast('Gebruik de vorm 2026-Q3');
   const r=await api('POST','inbox/btw-aangifte',{naam:f.naam,jaar:+x[1],kwartaal:+x[2]});toast('Opgeslagen in '+r.pad);go('inbox');
 }
+let vwkTimer=null;
+function verwerkKnop(s){
+  const e=$('#vwk');if(!e)return;
+  if(s&&s.status==='bezig'){e.innerHTML='<button class="b" disabled>Bezig met verwerken…</button> <span class="k">dit duurt ca. 1–3 minuten, je mag op deze pagina blijven</span>';return}
+  e.innerHTML=cache.inbox.bestanden.length?'<button class="b" onclick="verwerkInbox()">Verwerk inbox ('+cache.inbox.bestanden.length+')</button>':'';
+}
+async function verwerkInbox(){
+  try{const s=await api('POST','inbox/verwerk');verwerkKnop(s);verwerkPoll()}catch(e){toast(e.message||'Starten mislukt')}
+}
+function verwerkPoll(){
+  clearInterval(vwkTimer);
+  vwkTimer=setInterval(async()=>{
+    if(state.page!=='inbox'){clearInterval(vwkTimer);return}
+    const s=await api('GET','inbox/verwerk');
+    if(s.status==='bezig')return;
+    clearInterval(vwkTimer);toast(s.melding||'Klaar');await inbox();
+    if(s.status==='fout'&&s.uitvoer)alert(s.melding+'\n\n'+s.uitvoer);
+  },3000);
+}
+async function verwerkHervat(){try{const s=await api('GET','inbox/verwerk');if(s.status==='bezig'){verwerkKnop(s);verwerkPoll()}}catch(e){}}
 function maakUitInbox(i){openBoeking({soort:'kosten',datum:today(),toewijzing:'ik',pct_ik:100,btw_soort:'nl21',rekening:'ing',betaald:1,inbox_bestand:cache.inbox.bestanden[i].naam})}
 
 /* ------------------------------------------------ boekingen */
