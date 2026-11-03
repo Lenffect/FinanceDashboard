@@ -54,6 +54,13 @@ def lees(tekst, eigen_rekeningen=(), regels=()):
     rd = csv.DictReader(io.StringIO(tekst), delimiter=';')
     rijen = list(rd)
     kol = rd.fieldnames or []
+    if 'Naam / Omschrijving' in kol:  # Nederlandstalige ING-export: omzetten naar de Engelse kolomnamen
+        kaart = {'Datum': 'Date', 'Naam / Omschrijving': 'Name / Description', 'Rekening': 'Account', 'Tegenrekening': 'Counterparty',
+                 'Af Bij': 'Debit/credit', 'Bedrag (EUR)': 'Amount (EUR)', 'Mededelingen': 'Notifications', 'Saldo na mutatie': 'Resulting balance'}
+        rijen = [{kaart.get(k, k): v for k, v in r.items()} for r in rijen]
+        for r in rijen:
+            r['Debit/credit'] = 'Credit' if (r.get('Debit/credit') or '').strip().lower() == 'bij' else 'Debit'
+        kol = list(rijen[0].keys()) if rijen else ['Name / Description']
     if 'Name / Description' in kol:
         soort = 'lopend'
     elif 'Account name' in kol:
@@ -70,7 +77,7 @@ def lees(tekst, eigen_rekeningen=(), regels=()):
             bedrag = _bedrag(r['Amount (EUR)'])
             naam = re.sub(r'\s+', ' ', r['Name / Description']).strip()
             notitie = r.get('Notifications') or ''
-            m = re.search(r'Description:\s*(.*?)(?:\s+IBAN:|\s+Value date:|\s+Reference:|$)', notitie)
+            m = re.search(r'Description:\s*(.*?)(?:\s+IBAN:|\s+Value date:|\s+Valutadatum:|\s+Reference:|\s+Referentie:|$)', notitie)
             oms = naam + ((' · ' + m.group(1).strip()[:90]) if m and m.group(1).strip() else '')
             tegen = (r.get('Counterparty') or '').strip()
             tp = naam

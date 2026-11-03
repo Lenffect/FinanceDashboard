@@ -255,7 +255,8 @@ async function bankSaldo(s,d){await api('POST','bank/saldo',{saldo:s,datum:d});t
 async function dashboard(){
   const d=await api('GET','dashboard?jaar='+state.jaar);
   const kwk=d.kwartalen.map(k=>`<tr class="klik" onclick="gaBtw(${d.jaar},${k.kwartaal})"><td><b>Q${k.kwartaal}</b> <span class="k">vóór ${dat(k.deadline)}</span></td><td class="num">${eur(k.omzet)}</td><td class="num">${eur(k.kosten)}</td><td class="num ${k.winst<0?'neg':''}">${eur(k.winst)}</td><td class="num">${eur(Math.abs(k.btw_saldo))} <span class="k">${k.btw_saldo>=0?'af':'terug'}</span></td></tr>`).join('');
-  const tot=d.kwartalen.reduce((a,k)=>({o:a.o+k.omzet,k:a.k+k.kosten}),{o:0,k:0});
+  const tot=d.kwartalen.reduce((a,k)=>({o:a.o+k.omzet,k:a.k+k.kosten,w:a.w+k.winst,b:a.b+k.btw_saldo}),{o:0,k:0,w:0,b:0});
+  const totRij=`<tr style="border-top:2px solid var(--line)"><td><b>Totaal ${d.jaar}</b> <span class="k">tot nu toe</span></td><td class="num"><b>${eur(tot.o)}</b></td><td class="num"><b>${eur(tot.k)}</b></td><td class="num ${tot.w<0?'neg':''}"><b>${eur(tot.w)}</b></td><td class="num"><b>${eur(Math.abs(tot.b))}</b> <span class="k">${tot.b>=0?'af':'terug'}</span></td></tr>`;
   const open=d.open_facturen.map(b=>`<tr class="klik" onclick="editBoeking(${b.id})"><td>${esc(b.factuurnr)}</td><td>${esc(b.relatie)}</td><td>${dat(b.datum)}</td><td class="num">${eur(b.bedrag_excl+b.btw_bedrag)}</td><td>${b.te_laat?`<span class="tag bad">${b.dagen_open} dagen open</span>`:`<span class="tag">${b.dagen_open} dagen</span>`}</td></tr>`).join('');
   const ctrl=d.te_controleren.map(b=>`<tr class="klik" onclick="editBoeking(${b.id})"><td>${dat(b.datum)}</td><td>${esc(b.omschrijving)}</td></tr>`).join('');
   $('#main').innerHTML=`<div class="bar"><h1>Overzicht</h1><select id="jr" onchange="state.jaar=+this.value;go('dashboard')">${yearOpts(state.jaar)}</select><span class="sp"></span>
@@ -263,18 +264,18 @@ async function dashboard(){
    ${state.inboxN?`<div class="note" style="cursor:pointer" onclick="go('inbox')">In de Inbox wacht nog werk op je: ${state.inboxN} bestand(en)/concept(en). Concepten tellen pas mee na je goedkeuring →</div>`:''}
    <div class="kpis">
     <div><div class="k">Omzet ${d.jaar} ex. btw</div><div class="big">${eur(tot.o)}</div></div>
-    <div><div class="k">Kosten (mijn deel)</div><div class="big">${eur(tot.k)}</div></div>
-    <div><div class="k">Winst</div><div class="big ${tot.o-tot.k<0?'neg':''}">${eur(tot.o-tot.k)}</div></div>
-    <div><div class="k">Wise-saldo (berekend)</div><div class="big">${eur(d.wise_saldo)}</div></div>
+    <div><div class="k">Kosten ${d.jaar}</div><div class="big">${eur(tot.k)}</div></div>
+    <div><div class="k">Winst ${d.jaar} (voor jou)</div><div class="big ${tot.w<0?'neg':''}">${eur(tot.w)}</div></div>
    </div>
    <div class="split">
-    <div><h2>Kwartalen</h2><table><thead><tr><th>Kwartaal</th><th class="num">Omzet</th><th class="num">Kosten</th><th class="num">Winst</th><th class="num">Btw</th></tr></thead><tbody>${kwk}</tbody></table></div>
+    <div><h2>Kwartalen</h2><table><thead><tr><th>Kwartaal</th><th class="num">Omzet</th><th class="num">Kosten</th><th class="num">Winst</th><th class="num">Btw</th></tr></thead><tbody>${kwk}${totRij}</tbody></table></div>
     <div><h2>Zakelijke rekening <button class="lnk sm" style="text-transform:none;letter-spacing:0;float:right;font-family:var(--sans)" onclick="saldoModal()">saldo bijwerken</button></h2><div class="card">
      <div class="row"><span class="k">Berekend (ING)</span><b>${eur(d.ing_saldo)}</b></div>
-     ${d.ing_werkelijk!=null?`<div class="row"><span class="k">Werkelijk (${dat(d.ing_datum)})</span><b>${eur(d.ing_werkelijk)}</b></div><div class="row"><span class="k">Verschil</span><b class="${Math.abs(d.ing_werkelijk-d.ing_saldo)<0.01?'pos':'neg'}">${eur(d.ing_werkelijk-d.ing_saldo)}</b></div>
+     ${d.ing_werkelijk!=null?`<div class="row"><span class="k">Werkelijk (${dat(d.ing_datum)})</span><b>${eur(d.ing_werkelijk)}</b></div><div class="row"><span class="k">Verschil</span><b class="${Math.abs(d.ing_werkelijk-d.ing_saldo)<0.01?'pos':'neg'}">${eur(d.ing_werkelijk-d.ing_saldo)}</b></div>`:''}
      <div class="row"><span class="k">− btw-reserve (${d.btw_reserve_items.map(i=>'Q'+i.kwartaal).join(' + ')||'—'})</span><span>${eur(d.btw_reserve)}</span></div>
      <div class="row"><span class="k">− te betalen aan ${esc(state.instellingen.partner_contact||'Jelmer')}</span><span>${eur(d.schuld_jelmer)}</span></div>
-     <div class="vrij"><b>Vrij te besteden</b><span class="big">${eur(d.vrij)}</span></div>`:'<div class="k" style="margin-top:6px">Vul je echte saldo in om het verschil en wat je vrij kunt besteden te zien.</div>'}</div></div>
+     <div class="vrij"><b>Vrij te besteden</b><span class="big">${eur(d.vrij)}</span></div>
+     <div class="k" style="margin-top:6px">Gebaseerd op het berekende saldo.</div></div></div>
    </div>
    <div class="grid g2"><div><h2>Openstaande facturen</h2>${open?`<table><thead><tr><th>Nr</th><th>Klant</th><th>Datum</th><th class="num">Bedrag incl.</th><th></th></tr></thead><tbody>${open}</tbody></table>`:'<div class="note ok">Alle facturen zijn betaald.</div>'}</div>
    <div><h2>Even controleren (${d.te_controleren.length})</h2>${ctrl?`<table><tbody>${ctrl}</tbody></table>`:'<div class="note ok">Niets om te controleren.</div>'}</div></div>`;
@@ -300,7 +301,7 @@ async function inbox(){
   <h2>Concepten om te controleren (${d.concepten.length})</h2>
   ${d.concepten.length?`<table><thead><tr><th>Datum</th><th>Omschrijving</th><th class="num">Excl.</th><th class="num">Btw</th><th>Btw-soort</th><th>Van wie</th><th></th></tr></thead><tbody>${d.concepten.map(b=>`<tr class="klik" onclick="editBoeking(${b.id})"><td>${dat(b.datum)}</td><td>${esc(b.omschrijving)}<div class="k">${esc(b.relatie)}${b.bijlage?' · 📎 '+esc(b.bijlage.split('/').pop()):''}</div></td><td class="num">${eur(b.bedrag_excl)}</td><td class="num">${eur(b.btw_bedrag)}</td><td class="sm">${BTWS[b.btw_soort]}</td><td>${tag(b)}</td><td>${b.mogelijk_dubbel.length?'<span class="tag bad">mogelijk dubbel</span>':''} ${b.controleren?'<span class="tag flag">controleren</span>':''}</td></tr>`).join('')}</tbody></table><p class="k">Klik een concept open: links zie je de factuur, rechts de ingevulde gegevens. Pas aan wat niet klopt en klik op Goedkeuren. Pas dan telt hij mee in je btw en overzicht.</p>`:'<div class="note ok">Geen concepten die op controle wachten.</div>'}
   <h2>Nog te verwerken bestanden (${d.bestanden.length})</h2>
-  ${d.bestanden.length?`<table><thead><tr><th>Bestand</th><th>Toegevoegd</th><th class="num">Grootte</th><th></th></tr></thead><tbody>${d.bestanden.map((f,i)=>`<tr><td><a href="/inbox/${encodeURIComponent(f.naam)}" target="_blank">${esc(f.naam)}</a></td><td class="sm">${f.datum}</td><td class="num sm">${Math.round(f.grootte/1024)} kB</td><td class="num"><button class="b sec" onclick="maakUitInbox(${i})">Zelf boeking maken</button> <button class="b sec" onclick="bewaarAangifte(${i})">Btw-aangifte</button></td></tr>`).join('')}</tbody></table>`:'<div class="note info">De inbox is leeg.</div>'}`;
+  ${d.bestanden.length?`<table><thead><tr><th>Bestand</th><th>Toegevoegd</th><th class="num">Grootte</th><th></th></tr></thead><tbody>${d.bestanden.map((f,i)=>`<tr><td><a href="/inbox/${encodeURIComponent(f.naam)}" target="_blank">${esc(f.naam)}</a></td><td class="sm">${f.datum}</td><td class="num sm">${Math.round(f.grootte/1024)} kB</td><td class="num"><button class="b sec" onclick="maakUitInbox(${i})">Zelf boeking maken</button> <button class="b sec" onclick="bewaarAangifte(${i})">Btw-aangifte</button> <button class="b sec" onclick="verwijderUitInbox(${i})">Verwijderen (dubbel)</button></td></tr>`).join('')}</tbody></table>`:'<div class="note info">De inbox is leeg.</div>'}`;
   verwerkKnop();verwerkHervat();
   const dz=$('#dz'),fi=$('#fi');
   dz.onclick=()=>fi.click();fi.onchange=()=>uploadFiles(fi.files);
@@ -311,6 +312,11 @@ async function uploadFiles(files){
   for(const f of files){const r=await fetch('/api/inbox/upload',{method:'POST',headers:{'X-Filename':encodeURIComponent(f.name)},body:f});
     if(!r.ok){toast((await r.json()).fout||'Upload mislukt')}}
   toast('Geüpload');go('inbox');
+}
+async function verwijderUitInbox(i){
+  const f=cache.inbox.bestanden[i];
+  if(!confirm('Dit bestand uit de inbox verwijderen?\n\n'+f.naam+'\n\nGebruik dit alleen als het een dubbele is: de boeking en bijlage bestaan al.'))return;
+  await api('POST','inbox/verwijder',{naam:f.naam});toast('Verwijderd');go('inbox');
 }
 async function bewaarAangifte(i){
   const f=cache.inbox.bestanden[i];const m=f.naam.match(/(20\d\d)\D{0,3}Q([1-4])/i);const l=lastQ();
@@ -334,6 +340,7 @@ function verwerkPoll(){
     const s=await api('GET','inbox/verwerk');
     if(s.status==='bezig')return;
     clearInterval(vwkTimer);toast(s.melding||'Klaar');await inbox();
+    if(s.status==='klaar'&&s.uitvoer&&/^0 van/.test(s.melding))alert(s.melding+'\n\n'+s.uitvoer+'\n\nIs het een dubbele? Gebruik dan "Verwijderen (dubbel)" bij het bestand.');
     if(s.status==='fout'&&s.uitvoer)alert(s.melding+'\n\n'+s.uitvoer);
   },3000);
 }
@@ -375,7 +382,7 @@ function openBoeking(b){
   const isC=b.status==='concept';
   const pv=b.inbox_bestand?{url:'/inbox/'+encodeURIComponent(b.inbox_bestand),naam:b.inbox_bestand}:(b.bijlage?{url:'/bijlage/'+b.id,naam:b.bijlage.split('/').pop()}:null);
   const rel=state.relaties.map(r=>`<option value="${esc(r.naam)}">`).join('');
-  const cats=['Omzet','Software & abonnementen','Hosting & domeinen','Onderaanneming JPPW','Oprichting','Overig','Privé',...new Set((cache.boekingen||[]).map(x=>x.categorie).filter(Boolean))];
+  const cats=['Omzet','Software & abonnementen','Hosting & domeinen','Onderaanneming JPPW','Oprichting','Afschrijving','Overig','Privé',...new Set((cache.boekingen||[]).map(x=>x.categorie).filter(Boolean))];
   const m=modal(wrapRv(pv,`<h3>${isC?'Concept controleren':(nieuw?'Nieuwe boeking':'Boeking bewerken')}</h3>${b.mogelijk_dubbel&&b.mogelijk_dubbel.length?`<div class="note">Let op: lijkt op een bestaande boeking (${b.mogelijk_dubbel.map(x=>esc(x.omschrijving)+' '+dat(x.datum)).join(', ')}). Mogelijk dubbel.</div>`:''}<form id="bf" class="fg">
    <label class="f c2"><span>Soort</span><select name="soort">${opts(SOORT,b.soort)}</select></label>
    <label class="f c2"><span>Datum (factuurdatum)</span><input type="date" name="datum" required></label>

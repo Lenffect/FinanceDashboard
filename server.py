@@ -541,7 +541,7 @@ def dashboard(jaar):
             'concepten': q("SELECT COUNT(*) n FROM boekingen WHERE status='concept'", one=True)['n'],
             'ing_saldo': ing, 'ing_werkelijk': werkelijk, 'ing_datum': cfg.get('ing_saldo_datum') or '',
             'btw_reserve': reserve, 'btw_reserve_items': reserve_items, 'schuld_jelmer': schuld,
-            'vrij': r2(werkelijk - reserve - schuld) if werkelijk is not None else None}
+            'vrij': r2(ing - reserve - schuld)}
 
 
 def verrekening(p):
@@ -1127,6 +1127,12 @@ class H(BaseHTTPRequestHandler):
                 c.execute("UPDATE instellingen SET waarde=? WHERE sleutel='ing_saldo_werkelijk'", (str(r2(body.get('saldo'))),))
                 c.execute("UPDATE instellingen SET waarde=? WHERE sleutel='ing_saldo_datum'", (d,))
                 c.commit()
+            return {'ok': True}
+        if p == 'inbox/verwijder' and method == 'POST':
+            fp = pad_in(INBOX, os.path.join('inbox', os.path.basename(body.get('naam') or '')))
+            if not fp:
+                raise ValueError('Bestand niet gevonden in de inbox')
+            os.remove(fp)
             return {'ok': True}
         if p == 'inbox/verwerk' and method == 'POST':
             return start_verwerk()
